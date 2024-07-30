@@ -1859,7 +1859,6 @@ enum ePedVarComp
 	PV_COMP_JBIB,
 	PV_COMP_MAX
 };
-
 //Source: https://natives.altv.mp/0x1913FE4CBF41C463
 namespace ePedConfigFlags
 {
