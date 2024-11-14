@@ -707,7 +707,7 @@ namespace BlipIcon {
 		SalvageYard = 867,
 		SalvageYardHeist = 868,
 		SalvageYardPlans = 879,
-		WeaponCrate = 880
+		WeaponCrate = 880,
 		Snowball = 881,
 		Tombstone = 885,
 		BottomDollarBounty = 886,
