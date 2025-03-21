@@ -171,7 +171,7 @@ inline void MenyooMain()
 	g_MenyooConfigTick = GetTickCount();
 	g_FaderTick = GetTickCount();
 
-	if (!NETWORK_IS_SESSION_STARTED())
+	if (!NETWORK_IS_SESSION_STARTED() && !IS_COMMANDLINE_END_USER_BENCHMARK() && !LANDING_SCREEN_STARTED_END_USER_BENCHMARK())
 	{
 		if (GTAmemory::FindShopController())
 			GeneralGlobalHax::EnableBlockedMpVehiclesInSp();
@@ -1666,7 +1666,6 @@ void set_no_clip()
 						Game::Print::PrintBottomCentre("Height Unlocked"); 
 					}
 				}
-				
 				// 处理鼠标滚轮来调整速度
 				if(IS_DISABLED_CONTROL_PRESSED(2, INPUT_CURSOR_SCROLL_UP))
 				{
@@ -1699,6 +1698,7 @@ void set_no_clip()
 			// 按空格键时速度固定为0.2
 			//float current_speed = IsKeyDown(VK_CONTROL) ? 0.2f : g_freecam_speed;
 			float current_speed = IS_DISABLED_CONTROL_PRESSED(2, INPUT_VEH_ATTACK2) ? MenuConfig::FreeCam::defaultSlowSpeed : g_freecam_speed;
+
 
 			// 让SPRINT基于当前速度增加
 			float noclip_prec_level = IS_DISABLED_CONTROL_PRESSED(0, INPUT_SPRINT) ? current_speed * 2.0f : current_speed;
@@ -1741,7 +1741,7 @@ void set_no_clip()
 						// 保存当前FOV为默认值
 						MenuConfig::FreeCam::defaultFov = currentFov;
 						MenuConfig::ConfigSave();
-						
+					
 						// 显示当前FOV值
 						Game::Print::PrintBottomCentre(oss_ << "Camera FOV: " << currentFov);
 					}
