@@ -321,6 +321,14 @@ bool bit_grav_gun_disabled = 0;
 float forge_dist = 6.0f, _globalForgeGun_prec = 0.2f, _globalForgeGun_shootForce = 300.0f;
 bool ObjSpawn_forge_assistance = 0;
 
+DWORD g_lastSpeedDisplayTime = 0;
+DWORD g_lastFOVDisplayTime = 0;
+float g_lastSpeedValue = 0.0f;
+float g_lastFOVValue = 0.0f;
+
+DWORD g_lastHeightLockMessageTime = 0;
+const char* g_lastHeightLockMessage = nullptr;
+
 #pragma endregion
 
 #pragma region methods used define // p.s. this ain't it chief
@@ -1661,11 +1669,13 @@ void set_no_clip()
 					if(g_freecam_heightLocked) {
 						// 锁定时存储当前高度
 						g_freecam_lockedHeight = ent.Position_get().z;
-						Game::Print::PrintBottomCentre("Height Locked");
+						g_lastHeightLockMessage = "Height Locked";
 					} else {
-						Game::Print::PrintBottomCentre("Height Unlocked"); 
+						g_lastHeightLockMessage = "Height Unlocked";
 					}
+					g_lastHeightLockMessageTime = GetTickCount();
 				}
+				
 				// 处理鼠标滚轮来调整速度
 				if(IS_DISABLED_CONTROL_PRESSED(2, INPUT_CURSOR_SCROLL_UP))
 				{
@@ -1678,7 +1688,11 @@ void set_no_clip()
 					MenuConfig::ConfigSave();
 					
 					// 在中间字幕区显示当前速度
-					Game::Print::PrintBottomCentre(oss_ << "FreeCam Speed: " << g_freecam_speed);
+					Game::Print::setupdraw(GTAfont::Impact, Vector2(0.4f, 0.4f), true, false, false);
+					Game::Print::drawstring(oss_ << "FreeCam Speed: " << g_freecam_speed, 0.5f, 0.95f);
+					
+					g_lastSpeedValue = g_freecam_speed;
+					g_lastSpeedDisplayTime = GetTickCount();
 				}
 				if(IS_DISABLED_CONTROL_PRESSED(2, INPUT_CURSOR_SCROLL_DOWN))  
 				{
@@ -1691,14 +1705,24 @@ void set_no_clip()
 					MenuConfig::ConfigSave();
 					
 					// 在中间字幕区显示当前速度
-					Game::Print::PrintBottomCentre(oss_ << "FreeCam Speed: " << g_freecam_speed);
+					Game::Print::setupdraw(GTAfont::Impact, Vector2(0.4f, 0.4f), true, false, false);
+					Game::Print::drawstring(oss_ << "FreeCam Speed: " << g_freecam_speed, 0.5f, 0.95f);
+					
+					g_lastSpeedValue = g_freecam_speed;
+					g_lastSpeedDisplayTime = GetTickCount();
+				}
+
+				// 检查是否需要显示速度文字
+				if(GetTickCount() - g_lastSpeedDisplayTime < 1000) // 1秒延迟
+				{
+					Game::Print::setupdraw(GTAfont::Impact, Vector2(0.4f, 0.4f), true, false, false);
+					Game::Print::drawstring(oss_ << "FreeCam Speed: " << g_lastSpeedValue, 0.5f, 0.95f);
 				}
 			}
 
 			// 按空格键时速度固定为0.2
 			//float current_speed = IsKeyDown(VK_CONTROL) ? 0.2f : g_freecam_speed;
 			float current_speed = IS_DISABLED_CONTROL_PRESSED(2, INPUT_VEH_ATTACK2) ? MenuConfig::FreeCam::defaultSlowSpeed : g_freecam_speed;
-
 
 			// 让SPRINT基于当前速度增加
 			float noclip_prec_level = IS_DISABLED_CONTROL_PRESSED(0, INPUT_SPRINT) ? current_speed * 2.0f : current_speed;
@@ -1741,9 +1765,13 @@ void set_no_clip()
 						// 保存当前FOV为默认值
 						MenuConfig::FreeCam::defaultFov = currentFov;
 						MenuConfig::ConfigSave();
-					
+						
 						// 显示当前FOV值
-						Game::Print::PrintBottomCentre(oss_ << "Camera FOV: " << currentFov);
+						Game::Print::setupdraw(GTAfont::Impact, Vector2(0.4f, 0.4f), true, false, false);
+						Game::Print::drawstring(oss_ << "Camera FOV: " << currentFov, 0.5f, 0.95f);
+						
+						g_lastFOVValue = currentFov;
+						g_lastFOVDisplayTime = GetTickCount();
 					}
 					if(IS_DISABLED_CONTROL_PRESSED(2, INPUT_CURSOR_SCROLL_DOWN)) // 向下滚动减小FOV 
 					{
@@ -1757,7 +1785,18 @@ void set_no_clip()
 						MenuConfig::ConfigSave();
 						
 						// 显示当前FOV值  
-						Game::Print::PrintBottomCentre(oss_ << "Camera FOV: " << currentFov);
+						Game::Print::setupdraw(GTAfont::Impact, Vector2(0.4f, 0.4f), true, false, false);
+						Game::Print::drawstring(oss_ << "Camera FOV: " << currentFov, 0.5f, 0.95f);
+						
+						g_lastFOVValue = currentFov;
+						g_lastFOVDisplayTime = GetTickCount();
+					}
+
+					// 检查是否需要显示FOV文字
+					if(GetTickCount() - g_lastFOVDisplayTime < 1000) // 1秒延迟
+					{
+						Game::Print::setupdraw(GTAfont::Impact, Vector2(0.4f, 0.4f), true, false, false);
+						Game::Print::drawstring(oss_ << "Camera FOV: " << g_lastFOVValue, 0.5f, 0.95f);
 					}
 				}
 
@@ -1776,6 +1815,12 @@ void set_no_clip()
 		}
 	}
 
+	// 检查是否需要显示锁定状态文字
+	if(g_lastHeightLockMessage != nullptr && GetTickCount() - g_lastHeightLockMessageTime < 1000)
+	{
+		Game::Print::setupdraw(GTAfont::Impact, Vector2(0.4f, 0.4f), true, false, false);
+		Game::Print::drawstring(g_lastHeightLockMessage, 0.5f, 0.95f);
+	}
 }
 
 // Playerped - ability
@@ -2349,7 +2394,7 @@ inline void set_Handling_Mult69_7()
 		if (IS_DISABLED_CONTROL_PRESSED(2, INPUT_SCRIPT_PAD_RIGHT) || IsKeyDown('D'))
 			APPLY_FORCE_TO_ENTITY(g_myVeh, 1, mult69_7 / 220, 0.0, 0.0, 0.0, 0.0, 0.0, 0, 1, 1, 1, 0, 1);
 		if (IS_DISABLED_CONTROL_PRESSED(2, INPUT_SCRIPT_PAD_LEFT) || IsKeyDown('A'))
-		APPLY_FORCE_TO_ENTITY(g_myVeh, 1, (0 - mult69_7) / 220, 0.0, 0.0, 0.0, 0.0, 0.0, 0, 1, 1, 1, 0, 1);
+		APPLY_FORCE_TO_ENTITY(g_myVeh, 1, (0 - mult69_7) / 220, 0.0, 0.0, 0.0, 0.0, 0.0, 0, 1, 1, 1, 0,1);
 	}
 	else
 	{
@@ -3454,7 +3499,7 @@ void Menu::loops()
 			set_vehicle_heavy_mass_tick(g_myVeh);
 
 
-		// ONLY IF PAUSE MENU IS INACTIVE
+			// ONLY IF PAUSE MENU IS INACTIVE
 		if (!gameIsPaused)
 		{
 			// Race boost (self)
