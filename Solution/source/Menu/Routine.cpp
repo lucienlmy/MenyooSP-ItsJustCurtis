@@ -1675,7 +1675,6 @@ void set_no_clip()
 					}
 					g_lastHeightLockMessageTime = GetTickCount();
 				}
-				
 				// 处理鼠标滚轮来调整速度
 				if(IS_DISABLED_CONTROL_PRESSED(2, INPUT_CURSOR_SCROLL_UP))
 				{
@@ -1765,7 +1764,7 @@ void set_no_clip()
 						// 保存当前FOV为默认值
 						MenuConfig::FreeCam::defaultFov = currentFov;
 						MenuConfig::ConfigSave();
-						
+            
 						// 显示当前FOV值
 						Game::Print::setupdraw(GTAfont::Impact, Vector2(0.4f, 0.4f), true, false, false);
 						Game::Print::drawstring(oss_ << "Camera FOV: " << currentFov, 0.5f, 0.95f);
