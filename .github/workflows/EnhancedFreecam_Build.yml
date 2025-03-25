@@ -235,6 +235,24 @@ jobs:
           Write-Host "Created zip file: $zipFile"
           Get-Item $zipFile
 
+      - name: Get commit messages
+        id: get_commits
+        shell: pwsh
+        run: |
+          # 获取从上一个标签到当前的所有提交
+          $commits = git log $(git describe --tags --abbrev=0 2>$null || echo HEAD^)..HEAD --pretty=format:"- %h: %s (%an)" --no-merges
+          
+          # 如果没有找到之前的标签，则获取最近的10个提交
+          if (-not $commits) {
+            $commits = git log -10 --pretty=format:"- %h: %s (%an)" --no-merges
+          }
+          
+          # 将提交信息设置为输出变量
+          $commitMessage = $commits -join "`n"
+          echo "commit_message<<EOF" >> $env:GITHUB_OUTPUT
+          echo "$commitMessage" >> $env:GITHUB_OUTPUT
+          echo "EOF" >> $env:GITHUB_OUTPUT
+
       - name: Create GitHub release
         id: create_release
         uses: softprops/action-gh-release@v1
@@ -246,6 +264,8 @@ jobs:
             
             更新内容:
             ${{ steps.get_commits.outputs.commit_message }}
+            
+            完整更新日志请查看: https://github.com/${{ github.repository }}/commits/${{ github.sha }}
           prerelease: ${{ contains(env.VERSION, 'a') || contains(env.VERSION, 'b') || contains(env.VERSION, 'rc') }}
           files: MenyooSP-${{ env.VERSION }}.zip
         env:
@@ -256,9 +276,3 @@ jobs:
         run: |
           echo "Release created with tag: ${{ env.VERSION }}"
           echo "Release URL: ${{ steps.create_release.outputs.html_url }}"
-
-      - name: Get commit messages
-        id: get_commits
-        run: |
-          $commitMessage = git log -1 --pretty=%B
-          echo "commit_message=$commitMessage" >> $env:GITHUB_OUTPUT
