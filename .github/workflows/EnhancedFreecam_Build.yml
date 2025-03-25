@@ -133,24 +133,25 @@ jobs:
       - uses: actions/checkout@v3
       - uses: actions/download-artifact@v4
 
-      - name: Extract version from macros.h
+      - name: Extract version from macros.h and commit count
         id: extract_version
         shell: bash
         run: |
+          # 在 release 阶段重新获取提交次数
           COMMIT_COUNT=$(git rev-list --count HEAD)
           BASE_VERSION=$(grep '#define MENYOO_CURRENT_VER_' Solution/source/macros.h | awk '{print $3}' | tr -d '"')
-          VERSION="v${BASE_VERSION}.${COMMIT_COUNT}"
+          VERSION="v${BASE_VERSION}.${COMMIT_COUNT}"  # 根据提交次数生成版本号
           FINAL_VERSION=$(echo $VERSION | sed 's/a\([0-9]*\)\.\([0-9]*\)/a\1-\2/')
           echo "VERSION=${FINAL_VERSION}" >> $GITHUB_ENV
-          echo "Extracted and adjusted version: $FINAL_VERSION"
+          echo "Final Version for release: $FINAL_VERSION"
 
       - name: Zip artifact for deployment
         run: Compress-Archive -Path "Solution/source/_Build/bin/Release/*" -DestinationPath "MenyooSP-${{ env.VERSION }}.zip"
 
-      - uses: "marvinpinto/action-automatic-releases@latest"
-        with:
-          repo_token: "${{ secrets.GITHUB_TOKEN }}"
-          automatic_release_tag: ${{ env.VERSION }}
-          title: ${{ env.VERSION }}
-          files: MenyooSP-${{ env.VERSION }}.zip
-          prerelease: false
+      - name: Create Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ env.VERSION }}" "MenyooSP-${{ env.VERSION }}.zip" \
+            --title "${{ env.VERSION }}" \
+            --generate-notes
