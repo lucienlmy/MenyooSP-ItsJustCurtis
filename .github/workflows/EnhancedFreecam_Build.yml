@@ -12,159 +12,243 @@ env:
 permissions:
   contents: write
   pull-requests: write
+  packages: write
 
 jobs:
   check-version-and-merge:
     runs-on: ubuntu-latest
     outputs:
       CANCELJOB: ${{ steps.set_output.outputs.CANCELJOB }}
-
+      VERSION: ${{ steps.calculate_version.outputs.VERSION }}
     steps:
       - name: Checkout repository
-        if: env.CANCELJOB != 'true'  
+        if: env.CANCELJOB != 'true'
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
 
-      - name: Extract version from macros.h
-        id: extract_version
-        if: env.CANCELJOB != 'true' 
+      - name: Calculate Version with Commit Count
+        id: calculate_version
+        if: env.CANCELJOB != 'true'
+        shell: bash
         run: |
-          VERSION=$(grep '#define MENYOO_CURRENT_VER_' Solution/source/macros.h | awk '{print $3}' | tr -d '"')
-          echo "VERSION=v$VERSION" >> $GITHUB_ENV
-          echo "Extracted version: $VERSION"
+          COMMIT_COUNT=$(git rev-list --count HEAD)
+          BASE_VERSION=$(grep '#define MENYOO_CURRENT_VER_' Solution/source/macros.h | awk '{print $3}' | tr -d '"')
+          VERSION="v${BASE_VERSION}.${COMMIT_COUNT}"
+          echo "VERSION=${VERSION}" >> $GITHUB_ENV
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "Generated base version: $VERSION"
 
       - name: Check if tag already exists and increment version
-        if: env.CANCELJOB != 'true' 
+        if: env.CANCELJOB != 'true'
+        id: increment_version
+        shell: bash
         run: |
-          VERSION=${{ env.VERSION }}
-          echo "Checking for tag: $VERSION"  
-          RELEASE_LIST=$(gh release list)
-          TAGS=$(echo "$RELEASE_LIST" | awk '{print $1}')
-          echo "$TAGS"
+          BASE_VERSION=${{ env.VERSION }}
+          COUNTER=1
+          FINAL_VERSION=$BASE_VERSION
 
-          echo "Checking if tag exists:"
-          BASE_VERSION=$VERSION
-          COUNTER=0
-          while [[ " $TAGS " == *" $VERSION "* ]]; do
+          echo "Checking if version $BASE_VERSION exists..."
+          # Check using GitHub API first
+          while gh api repos/${{ github.repository }}/git/ref/tags/$FINAL_VERSION --silent >/dev/null 2>&1; do
+            echo "Version $FINAL_VERSION already exists, incrementing..."
+            FINAL_VERSION="${BASE_VERSION}.${COUNTER}"
             COUNTER=$((COUNTER + 1))
-            VERSION="${BASE_VERSION}-${COUNTER}"
+            echo "Trying new version: $FINAL_VERSION"
           done
 
-          echo "Final Version: $VERSION"
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          # Double-check with git ls-remote as fallback
+          if git ls-remote --tags origin "refs/tags/$FINAL_VERSION" | grep -q "$FINAL_VERSION"; then
+            echo "Fallback check found existing tag $FINAL_VERSION, incrementing further..."
+            FINAL_VERSION="${BASE_VERSION}.${COUNTER}"
+            COUNTER=$((COUNTER + 1))
+          fi
 
+          echo "Final version after increment checks: $FINAL_VERSION"
+          echo "VERSION=$FINAL_VERSION" >> $GITHUB_ENV
+          echo "version=$FINAL_VERSION" >> $GITHUB_OUTPUT
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Check version pattern and merge
         id: check_version
-        if: env.CANCELJOB != 'true' 
+        if: env.CANCELJOB != 'true'
+        shell: bash
         run: |
           VERSION=${{ env.VERSION }}
-          echo "Checking version pattern: $VERSION"
+          echo "Final version check for: $VERSION"
+          
           if [[ $GITHUB_REF == "refs/heads/main" ]]; then
             echo "Already on main branch. Skipping merge check."
             exit 0
           fi
 
-          # Function to check for existing PR with the same version
+          # Improved PR check function
           check_pr_exists() {
-            PR_LIST=$(gh pr list --head EnhancedFreecam-joy --base main --state open --json title,body)
-            PR_EXIST=$(echo "$PR_LIST" | jq -r --arg VERSION "$VERSION" '.[] | select((.title | contains($VERSION)) or (.body | contains($VERSION)))')
-            [ -n "$PR_EXIST" ]
+            PR_LIST=$(gh pr list --head EnhancedFreecam-joy --base main --state open --json title,body,number)
+            echo "Current PRs: $PR_LIST"
+            PR_EXISTS=$(echo "$PR_LIST" | jq -r --arg VERSION "$VERSION" '.[] | select((.title | contains($VERSION)) or (.body | contains($VERSION)))')
+            if [ -n "$PR_EXISTS" ]; then
+              echo "Found existing PR with version $VERSION:"
+              echo "$PR_EXISTS"
+              return 0
+            else
+              return 1
+            fi
           }
 
-          if [[ $VERSION =~ ^v?[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "Version is a full release. Creating pull request to merge into main."
-            echo "## Check for existing PR"
+          # Enhanced version pattern matching
+          if [[ $VERSION =~ ^v[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then
+            echo "Version $VERSION is a full release format"
             if check_pr_exists; then
-              echo "PR already exists with version $VERSION."
+              echo "PR already exists with version $VERSION"
+              echo "CANCELJOB=true" >> $GITHUB_ENV
+              exit 0
+            else
+              echo "Creating new PR for version $VERSION"
+              gh pr create \
+                --title "Release $VERSION" \
+                --body "Merging EnhancedFreecam-joy into main for release $VERSION" \
+                --base main \
+                --head EnhancedFreecam-joy
               echo "CANCELJOB=true" >> $GITHUB_ENV
               exit 0
             fi
-            echo "Creating new PR."
-            gh pr create --title "Release $VERSION" --body "Merging EnhancedFreecam-joy into main for release $VERSION" --base main --head EnhancedFreecam-joy
-            echo "CANCELJOB=true" >> $GITHUB_ENV
-            exit 0
-          elif [[ $VERSION =~ ^v?[0-9]+\.[0-9]+\.[0-9]+(a|b|rc)[0-9]+$ ]]; then
-            echo "Version is a pre-release. Proceeding with pre-release build."
+          elif [[ $VERSION =~ ^v[0-9]+\.[0-9]+\.[0-9]+(a|b|rc)[0-9]+$ ]]; then
+            echo "Version $VERSION is a pre-release format"
           else
-            echo "Version is invalid or a development version. Cancelling workflow."
+            echo "Version $VERSION is invalid or development version"
             echo "CANCELJOB=true" >> $GITHUB_ENV
             exit 0
           fi
-        shell: bash
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set output
         id: set_output
-        if: env.CANCELJOB != 'true' 
-        run: echo "CANCELJOB=${{ env.CANCELJOB }}" >> $GITHUB_OUTPUT
+        if: env.CANCELJOB != 'true'
+        run: |
+          echo "CANCELJOB=${{ env.CANCELJOB }}" >> $GITHUB_OUTPUT
+          echo "version=${{ env.VERSION }}" >> $GITHUB_OUTPUT
 
   build:
     if: github.ref == 'refs/heads/EnhancedFreecam-joy' && needs.check-version-and-merge.outputs.CANCELJOB != 'true'
     runs-on: windows-latest
     needs: check-version-and-merge
-
+    env:
+      VERSION: ${{ needs.check-version-and-merge.outputs.VERSION }}
+    outputs:
+      VERSION: ${{ needs.check-version-and-merge.outputs.VERSION }}
     steps:
-    - uses: actions/checkout@v3
-      with:
-        submodules: recursive
-
-    - name: Add MSBuild to PATH
-      uses: microsoft/setup-msbuild@v1.1
-
-    - name: Build
-      working-directory: ${{env.GITHUB_WORKSPACE}}
-      run: msbuild /m /p:Configuration=${{env.BUILD_CONFIGURATION}} ${{env.SOLUTION_FILE_PATH}} -verbosity:minimal
-
-    - name: Upload a Build Artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: MenyooSP
-        path: |
-          Solution/source/_Build/bin/Release/
-          !Solution/source/_Build/bin/Release/Trash/
-          !Solution/source/_Build/bin/Release/*.map
-
-    - name: Cancel Workflow Action if build fails
-      uses: vishnudxb/cancel-workflow@v1.2
-      if: failure()
-      with:
-        repo: lucienlmy/MenyooSP-ItsJustCurtis
-        workflow_id: ${{ github.run_id }}
-        access_token: ${{ github.token }}
-
-  pre-release:
-    needs: build
-    permissions: write-all
-    name: "Pre Release"
-    runs-on: windows-latest
-
-    steps:
-      - uses: actions/checkout@v3
-
-      - uses: actions/download-artifact@v4
-      
-      - name: Extract version from macros.h
-        id: extract_version
+      - name: Verify Version
         run: |
-          Select-String -Path "Solution\source\macros.h" -Pattern '#define MENYOO_CURRENT_VER_' | ForEach-Object {
-            $_.Line -match '#define MENYOO_CURRENT_VER_\s+"(.*?)"' | Out-Null
-            $matches[1]
-          } | Out-File -FilePath version.txt
-          $VERSION = Get-Content version.txt
-          echo "VERSION=v$VERSION" >> $env:GITHUB_ENV
-          echo "Extracted version: $VERSION"
+          if ([string]::IsNullOrEmpty("${{ env.VERSION }}")) {
+            Write-Error "Version is empty or not set"
+            exit 1
+          }
+          echo "Building version: ${{ env.VERSION }}"
 
-      - name: Zip artifact for deployment
-        run: Compress-Archive -Path "MenyooSP/*" -DestinationPath "MenyooSP.zip"
-
-      - uses: "marvinpinto/action-automatic-releases@latest"
+      - name: Checkout code
+        uses: actions/checkout@v3
         with:
-          repo_token: "${{ secrets.GITHUB_TOKEN }}"
-          automatic_release_tag: ${{ env.VERSION }}
-          prerelease: ${{ github.ref_name != 'main' }}
-          title: ${{ steps.version.outputs.version}}
-          files: MenyooSP.zip
-          dry-run: true
+          submodules: recursive
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v1.1
+
+      - name: Build solution
+        working-directory: ${{ env.GITHUB_WORKSPACE }}
+        run: |
+          msbuild /m /p:Configuration=${{ env.BUILD_CONFIGURATION }} ${{ env.SOLUTION_FILE_PATH }} -verbosity:minimal -p:WarningLevel=0
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: MenyooSP-${{ env.VERSION }}
+          path: |
+            Solution/source/_Build/bin/Release/
+            !Solution/source/_Build/bin/Release/Trash/
+            !Solution/source/_Build/bin/Release/*.map
+            !Solution/source/_Build/bin/Release/*.pdb
+
+      - name: Cancel workflow on failure
+        if: failure()
+        uses: andymckay/cancel-action@0.2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  release:
+    needs: [check-version-and-merge, build]
+    permissions:
+      contents: write
+      packages: write
+    runs-on: windows-latest
+    env:
+      VERSION: ${{ needs.check-version-and-merge.outputs.VERSION }}
+    steps:
+      - name: Debug Version
+        run: |
+          echo "VERSION: ${{ env.VERSION }}"
+          echo "check-version-and-merge VERSION: ${{ needs.check-version-and-merge.outputs.VERSION }}"
+
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: MenyooSP-${{ env.VERSION }}
+          path: artifacts
+
+      - name: Verify downloaded artifacts
+        run: |
+          echo "Verifying downloaded artifacts in the 'artifacts' folder:"
+          ls artifacts -Recurse
+
+      - name: Create release zip
+        shell: pwsh
+        run: |
+          # Use the downloaded artifacts directory as the source for ZIP
+          $sourceDir = "artifacts"
+          $zipFile = "MenyooSP-${{ env.VERSION }}.zip"
+          
+          Write-Host "Listing contents of artifacts folder:"
+          Get-ChildItem $sourceDir -Recurse
+
+          if (-Not (Test-Path $sourceDir)) {
+            Write-Error "Source directory does not exist: $sourceDir"
+            exit 1
+          }
+
+          if (Test-Path $zipFile) {
+            Remove-Item $zipFile -Force
+          }
+          
+          # Use Compress-Archive to create the zip file from the artifacts folder
+          Compress-Archive -Path "$sourceDir\*" -DestinationPath $zipFile
+
+          if (-Not (Test-Path $zipFile)) {
+            Write-Error "Failed to create zip file: $zipFile"
+            exit 1
+          }
+
+          Write-Host "Created zip file: $zipFile"
+          Get-Item $zipFile
+
+      - name: Create GitHub release
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ env.VERSION }}
+          name: "MenyooSP ${{ env.VERSION }}"
+          body: "Automated release of MenyooSP version ${{ env.VERSION }}"
+          prerelease: ${{ contains(env.VERSION, 'a') || contains(env.VERSION, 'b') || contains(env.VERSION, 'rc') }}
+          files: MenyooSP-${{ env.VERSION }}.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify release
+        if: always()
+        run: |
+          echo "Release created with tag: ${{ env.VERSION }}"
+          echo "Release URL: ${{ steps.create_release.outputs.html_url }}"
