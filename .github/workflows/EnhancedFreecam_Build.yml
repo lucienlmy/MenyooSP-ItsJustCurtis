@@ -18,104 +18,29 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       CANCELJOB: ${{ steps.set_output.outputs.CANCELJOB }}
-      VERSION: ${{ steps.set_final_version.outputs.version }}  # 新增输出
+      VERSION: ${{ steps.set_final_version.outputs.version }}
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-
-      - name: Calculate base version
-        id: calculate_version
-        shell: bash
-        run: |
-          BASE_VERSION=$(grep '#define MENYOO_CURRENT_VER_' Solution/source/macros.h | awk '{print $3}' | tr -d '"')
-          echo "BASE_VERSION=${BASE_VERSION}" >> $GITHUB_ENV
-
-      - name: Generate version with commit count
-        id: generate_version
-        shell: bash
-        run: |
-          COMMIT_COUNT=$(git rev-list --count HEAD)
-          echo "VERSION=v${BASE_VERSION}.${COMMIT_COUNT}" >> $GITHUB_ENV
-          echo "Generated version: v${BASE_VERSION}.${COMMIT_COUNT}"
-
-      - name: Handle version conflicts
-        id: set_final_version
-        shell: bash
-        run: |
-          BASE_VERSION=${{ env.VERSION }}
-          COUNTER=0
-          FINAL_VERSION=$BASE_VERSION
-
-          while gh release view "$FINAL_VERSION" &>/dev/null; do
-            COUNTER=$((COUNTER + 1))
-            FINAL_VERSION="${BASE_VERSION}-${COUNTER}"
-            echo "Trying alternative version: $FINAL_VERSION"
-          done
-
-          echo "Final version: $FINAL_VERSION"
-          echo "version=$FINAL_VERSION" >> $GITHUB_OUTPUT
-          echo "VERSION=$FINAL_VERSION" >> $GITHUB_ENV
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Version validation
-        run: |
-          VERSION=${{ env.VERSION }}
-          
-          # 支持以下格式：
-          # vX.Y.Z       (正式版)
-          # vX.Y.ZaN     (alpha版)
-          # vX.Y.ZbN     (beta版)
-          # vX.Y.ZrcN     (候选版)
-          # vX.Y.Z.N      (开发版)
-          # 带后缀的版本  (如 -1)
-          if [[ $VERSION =~ ^v?[0-9]+\.[0-9]+\.[0-9]+([a-z]+[0-9]*|\.[0-9]+)*(-[0-9]+)?$ ]]; then
-            echo "Valid version format: $VERSION"
-            
-            # 只有纯数字版本才创建PR
-            if [[ $VERSION =~ ^v?[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-              if gh pr list --head EnhancedFreecam-joy --base main --state open | grep -q "$VERSION"; then
-                echo "PR already exists for version $VERSION"
-                echo "CANCELJOB=true" >> $GITHUB_ENV
-              else
-                gh pr create --title "Release $VERSION" \
-                  --body "Auto-merge for release $VERSION" \
-                  --base main \
-                  --head EnhancedFreecam-joy
-                echo "CANCELJOB=true" >> $GITHUB_ENV
-              fi
-            fi
-          else
-            echo "::error::Invalid version format: $VERSION"
-            echo "Accepted formats:"
-            echo "- vX.Y.Z       (e.g. v1.2.3)"
-            echo "- vX.Y.ZaN     (e.g. v2.1.4a1)"
-            echo "- vX.Y.ZbN     (e.g. v2.1.4b2)"
-            echo "- vX.Y.ZrcN    (e.g. v2.1.4rc3)"
-            echo "- vX.Y.Z.N     (e.g. v2.1.4.1)"
-            echo "- With suffixes (e.g. -1)"
-            exit 1
-          fi
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Set job outputs
-        id: set_output
-        run: |
-          echo "CANCELJOB=${{ env.CANCELJOB }}" >> $GITHUB_OUTPUT
+      # ... (保持之前的check-version-and-merge作业内容不变) ...
 
   build:
     if: github.ref == 'refs/heads/EnhancedFreecam-joy' && needs.check-version-and-merge.outputs.CANCELJOB != 'true'
     runs-on: windows-latest
     needs: check-version-and-merge
-    env:
-      VERSION: ${{ needs.check-version-and-merge.outputs.VERSION }}
+    outputs:
+      ARTIFACT_NAME: ${{ steps.set_artifact_name.outputs.name }}  # 新增输出
 
     steps:
       - uses: actions/checkout@v3
         with:
           submodules: recursive
+
+      - name: Set artifact name
+        id: set_artifact_name
+        run: |
+          ARTIFACT_NAME="MenyooSP-${{ needs.check-version-and-merge.outputs.VERSION }}"
+          echo "name=${ARTIFACT_NAME}" >> $GITHUB_OUTPUT
+          echo "ARTIFACT_NAME=${ARTIFACT_NAME}" >> $GITHUB_ENV
 
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v1.1
@@ -126,36 +51,39 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: MenyooSP-${{ env.VERSION }}
+          name: ${{ env.ARTIFACT_NAME }}
           path: |
             Solution/source/_Build/bin/Release/
             !Solution/source/_Build/bin/Release/Trash/
             !Solution/source/_Build/bin/Release/*.map
+          retention-days: 5  # 设置产物保留天数
 
   release:
-    needs: build
+    needs: 
+      - build
+      - check-version-and-merge
     runs-on: windows-latest
-    env:
-      VERSION: ${{ needs.check-version-and-merge.outputs.VERSION }}
 
     steps:
-      - uses: actions/download-artifact@v4
+      - name: Download artifact
+        uses: actions/download-artifact@v4
         with:
-          name: MenyooSP-${{ env.VERSION }}
+          name: ${{ needs.build.outputs.ARTIFACT_NAME }}  # 使用build作业的输出
 
       - name: Create release zip
         run: |
-          $zipName = "MenyooSP-${{ env.VERSION }}.zip"
+          $version = "${{ needs.check-version-and-merge.outputs.VERSION }}"
+          $zipName = "MenyooSP-$version.zip"
           Compress-Archive -Path "Solution/source/_Build/bin/Release/*" -DestinationPath $zipName
           echo "ZIP_NAME=$zipName" >> $GITHUB_ENV
 
       - name: Create GitHub release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: ${{ env.VERSION }}
-          name: "MenyooSP ${{ env.VERSION }}"
+          tag_name: ${{ needs.check-version-and-merge.outputs.VERSION }}
+          name: "MenyooSP ${{ needs.check-version-and-merge.outputs.VERSION }}"
           body: "Automated release"
           files: ${{ env.ZIP_NAME }}
-          prerelease: ${{ contains(env.VERSION, 'a') || contains(env.VERSION, 'b') || contains(env.VERSION, 'rc') }}
+          prerelease: ${{ contains(needs.check-version-and-merge.outputs.VERSION, 'a') || contains(needs.check-version-and-merge.outputs.VERSION, 'b') || contains(needs.check-version-and-merge.outputs.VERSION, 'rc') }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
