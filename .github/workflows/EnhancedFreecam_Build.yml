@@ -12,6 +12,7 @@ env:
 permissions:
   contents: write
   pull-requests: write
+  packages: write
 
 jobs:
   check-version-and-merge:
@@ -88,7 +89,7 @@ jobs:
           check_pr_exists() {
             PR_LIST=$(gh pr list --head EnhancedFreecam-joy --base main --state open --json title,body,number)
             echo "Current PRs: $PR_LIST"
-            PR_EXISTS=$(echo "$PR_LIST" | jq -r --arg VERSION "$VERSION" '.[] | select((.title | contains($VERSION)) or (.body | contains($VERSION))')
+            PR_EXISTS=$(echo "$PR_LIST" | jq -r --arg VERSION "$VERSION" '.[] | select((.title | contains($VERSION)) or (.body | contains($VERSION)))')
             if [ -n "$PR_EXISTS" ]; then
               echo "Found existing PR with version $VERSION:"
               echo "$PR_EXISTS"
@@ -174,7 +175,6 @@ jobs:
     permissions:
       contents: write
       packages: write
-      releases: write
     runs-on: windows-latest
     env:
       VERSION: ${{ needs.check-version-and-merge.outputs.VERSION }}
