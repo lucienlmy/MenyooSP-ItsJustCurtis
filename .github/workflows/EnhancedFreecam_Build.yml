@@ -21,43 +21,44 @@ jobs:
 
     steps:
       - name: Checkout repository
-        if: env.CANCELJOB != 'true'  
+        if: env.CANCELJOB != 'true'
         uses: actions/checkout@v3
 
-      - name: Extract version from macros.h
-        id: extract_version
-        if: env.CANCELJOB != 'true' 
+      - name: Calculate Version with Commit Count
+        id: calculate_version
+        if: env.CANCELJOB != 'true'
+        shell: bash
         run: |
-          VERSION=$(grep '#define MENYOO_CURRENT_VER_' Solution/source/macros.h | awk '{print $3}' | tr -d '"')
-          echo "VERSION=v$VERSION" >> $GITHUB_ENV
-          echo "Extracted version: $VERSION"
+          COMMIT_COUNT=$(git rev-list --count HEAD)
+          BASE_VERSION=$(grep '#define MENYOO_CURRENT_VER_' Solution/source/macros.h | awk '{print $3}' | tr -d '"')
+          VERSION="v${BASE_VERSION}.${COMMIT_COUNT}"
+          echo "VERSION=${VERSION}" >> $GITHUB_ENV
+          echo "Generated version: $VERSION"
 
       - name: Check if tag already exists and increment version
-        if: env.CANCELJOB != 'true' 
+        if: env.CANCELJOB != 'true'
+        shell: bash
         run: |
-          VERSION=${{ env.VERSION }}
-          echo "Checking for tag: $VERSION"  
-          RELEASE_LIST=$(gh release list)
-          TAGS=$(echo "$RELEASE_LIST" | awk '{print $1}')
-          echo "$TAGS"
+          BASE_VERSION=${{ env.VERSION }}
+          COUNTER=0
+          FINAL_VERSION=$BASE_VERSION
 
           echo "Checking if tag exists:"
-          BASE_VERSION=$VERSION
-          COUNTER=0
-          while [[ " $TAGS " == *" $VERSION "* ]]; do
+          while gh release list --json tagName | jq -r '.[].tagName' | grep -q "^$FINAL_VERSION$"; do
             COUNTER=$((COUNTER + 1))
-            VERSION="${BASE_VERSION}-${COUNTER}"
+            FINAL_VERSION="${BASE_VERSION}-${COUNTER}"
           done
 
-          echo "Final Version: $VERSION"
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
-
+          echo "No conflicts found. Final Version: $FINAL_VERSION"
+          echo "VERSION=$FINAL_VERSION" >> $GITHUB_ENV
+          echo "Final Version after increment: $FINAL_VERSION"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Check version pattern and merge
         id: check_version
-        if: env.CANCELJOB != 'true' 
+        if: env.CANCELJOB != 'true'
+        shell: bash
         run: |
           VERSION=${{ env.VERSION }}
           echo "Checking version pattern: $VERSION"
@@ -92,13 +93,12 @@ jobs:
             echo "CANCELJOB=true" >> $GITHUB_ENV
             exit 0
           fi
-        shell: bash
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set output
         id: set_output
-        if: env.CANCELJOB != 'true' 
+        if: env.CANCELJOB != 'true'
         run: echo "CANCELJOB=${{ env.CANCELJOB }}" >> $GITHUB_OUTPUT
 
   build:
@@ -121,7 +121,7 @@ jobs:
     - name: Upload a Build Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: MenyooSP
+        name: MenyooSP-${{ env.VERSION }}
         path: |
           Solution/source/_Build/bin/Release/
           !Solution/source/_Build/bin/Release/Trash/
@@ -135,10 +135,10 @@ jobs:
         workflow_id: ${{ github.run_id }}
         access_token: ${{ github.token }}
 
-  pre-release:
+  release:
     needs: build
     permissions: write-all
-    name: "Pre Release"
+    name: "Release"
     runs-on: windows-latest
 
     steps:
@@ -148,23 +148,23 @@ jobs:
       
       - name: Extract version from macros.h
         id: extract_version
+        shell: bash
         run: |
-          Select-String -Path "Solution\source\macros.h" -Pattern '#define MENYOO_CURRENT_VER_' | ForEach-Object {
-            $_.Line -match '#define MENYOO_CURRENT_VER_\s+"(.*?)"' | Out-Null
-            $matches[1]
-          } | Out-File -FilePath version.txt
-          $VERSION = Get-Content version.txt
-          echo "VERSION=v$VERSION" >> $env:GITHUB_ENV
-          echo "Extracted version: $VERSION"
+          COMMIT_COUNT=$(git rev-list --count HEAD)
+          BASE_VERSION=$(grep '#define MENYOO_CURRENT_VER_' Solution/source/macros.h | awk '{print $3}' | tr -d '"')
+          VERSION="v${BASE_VERSION}.${COMMIT_COUNT}"
+          # Adjust version format
+          FINAL_VERSION=$(echo $VERSION | sed 's/a\([0-9]*\)\.\([0-9]*\)/a\1-\2/')
+          echo "VERSION=${FINAL_VERSION}" >> $GITHUB_ENV
+          echo "Extracted and adjusted version: $FINAL_VERSION"
 
       - name: Zip artifact for deployment
-        run: Compress-Archive -Path "MenyooSP/*" -DestinationPath "MenyooSP.zip"
+        run: Compress-Archive -Path "Solution/source/_Build/bin/Release/*" -DestinationPath "MenyooSP-${{ env.VERSION }}.zip"
 
       - uses: "marvinpinto/action-automatic-releases@latest"
         with:
           repo_token: "${{ secrets.GITHUB_TOKEN }}"
           automatic_release_tag: ${{ env.VERSION }}
-          prerelease: ${{ github.ref_name != 'main' }}
-          title: ${{ steps.version.outputs.version}}
-          files: MenyooSP.zip
-          dry-run: true
+          title: ${{ env.VERSION }}
+          files: MenyooSP-${{ env.VERSION }}.zip
+          prerelease: false

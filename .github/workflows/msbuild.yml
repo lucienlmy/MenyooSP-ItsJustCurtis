@@ -5,6 +5,7 @@ on:
     branches-ignore:
       - main
       - Development
+      - EnhancedFreecam-joy
 
 env:
   # Path to the solution file relative to the root of the project.
