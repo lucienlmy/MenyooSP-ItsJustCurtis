@@ -139,8 +139,18 @@ jobs:
     needs: check-version-and-merge
     env:
       VERSION: ${{ needs.check-version-and-merge.outputs.VERSION }}
+    outputs:
+      VERSION: ${{ needs.check-version-and-merge.outputs.VERSION }}
 
     steps:
+      - name: Verify Version
+        run: |
+          if ([string]::IsNullOrEmpty("${{ env.VERSION }}")) {
+            Write-Error "Version is empty or not set"
+            exit 1
+          }
+          echo "Building version: ${{ env.VERSION }}"
+
       - name: Checkout code
         uses: actions/checkout@v3
         with:
@@ -171,7 +181,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
   release:
-    needs: build
+    needs: [check-version-and-merge, build]
     permissions:
       contents: write
       packages: write
@@ -180,6 +190,11 @@ jobs:
       VERSION: ${{ needs.check-version-and-merge.outputs.VERSION }}
 
     steps:
+      - name: Debug Version
+        run: |
+          echo "VERSION: ${{ env.VERSION }}"
+          echo "check-version-and-merge VERSION: ${{ needs.check-version-and-merge.outputs.VERSION }}"
+
       - name: Checkout repository
         uses: actions/checkout@v3
 
