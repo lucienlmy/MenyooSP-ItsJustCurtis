@@ -28,9 +28,10 @@ jobs:
         if: env.CANCELJOB != 'true'
         shell: bash
         run: |
+          # 获取总提交次数
           COMMIT_COUNT=$(git rev-list --count HEAD)
           BASE_VERSION=$(grep '#define MENYOO_CURRENT_VER_' Solution/source/macros.h | awk '{print $3}' | tr -d '"')
-          VERSION="v${BASE_VERSION}.${COMMIT_COUNT}"
+          VERSION="v${BASE_VERSION}.${COMMIT_COUNT}"  # 生成版本号
           echo "VERSION=${VERSION}" >> $GITHUB_ENV
           echo "Generated version: $VERSION"
 
@@ -58,7 +59,7 @@ jobs:
           VERSION=${{ env.VERSION }}
           echo "Checking version pattern: $VERSION"
 
-          # Function to check for existing PR with the same version
+          # 检查是否已经存在相同版本号的 PR
           check_pr_exists() {
             PR_LIST=$(gh pr list --head EnhancedFreecam-joy --base main --state open --json title,body)
             PR_EXIST=$(echo "$PR_LIST" | jq -r --arg VERSION "$VERSION" '.[] | select((.title | contains($VERSION)) or (.body | contains($VERSION)))')
