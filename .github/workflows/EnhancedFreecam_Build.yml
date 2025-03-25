@@ -241,7 +241,11 @@ jobs:
         with:
           tag_name: ${{ env.VERSION }}
           name: "MenyooSP ${{ env.VERSION }}"
-          body: "Automated release of MenyooSP version ${{ env.VERSION }}"
+          body: |
+            版本: ${{ env.VERSION }}
+            
+            更新内容:
+            ${{ steps.get_commits.outputs.commit_message }}
           prerelease: ${{ contains(env.VERSION, 'a') || contains(env.VERSION, 'b') || contains(env.VERSION, 'rc') }}
           files: MenyooSP-${{ env.VERSION }}.zip
         env:
@@ -252,3 +256,9 @@ jobs:
         run: |
           echo "Release created with tag: ${{ env.VERSION }}"
           echo "Release URL: ${{ steps.create_release.outputs.html_url }}"
+
+      - name: Get commit messages
+        id: get_commits
+        run: |
+          $commitMessage = git log -1 --pretty=%B
+          echo "commit_message=$commitMessage" >> $env:GITHUB_OUTPUT
