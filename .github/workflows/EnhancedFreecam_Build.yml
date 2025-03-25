@@ -207,13 +207,18 @@ jobs:
       - name: Create release zip
         shell: pwsh
         run: |
-          $sourceDir = "artifacts"
+          $sourceDir = "artifacts/MenyooSP-${{ env.VERSION }}"
           $zipFile = "MenyooSP-${{ env.VERSION }}.zip"
           
+          if (-Not (Test-Path $sourceDir)) {
+            Write-Error "Source directory does not exist: $sourceDir"
+            exit 1
+          }
+
           if (Test-Path $zipFile) {
             Remove-Item $zipFile
           }
-          
+
           Add-Type -AssemblyName System.IO.Compression.FileSystem
           [System.IO.Compression.ZipFile]::CreateFromDirectory(
             (Resolve-Path $sourceDir).Path,
@@ -221,7 +226,12 @@ jobs:
             [System.IO.Compression.CompressionLevel]::Optimal,
             $false
           )
-          
+
+          if (-Not (Test-Path $zipFile)) {
+            Write-Error "Failed to create zip file: $zipFile"
+            exit 1
+          }
+
           Write-Host "Created zip file: $zipFile"
           Get-Item $zipFile
 
