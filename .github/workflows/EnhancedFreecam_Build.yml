@@ -1,8 +1,8 @@
 name: EnhancedFreecam_Build
+
 on:
   push:
-    branches:
-      - EnhancedFreecam-joy
+    branches: [ "EnhancedFreecam-joy" ]
 
 env:
   SOLUTION_FILE_PATH: ./Solution/Menyoo.sln
@@ -18,6 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       CANCELJOB: ${{ steps.set_output.outputs.CANCELJOB }}
+
     steps:
       - name: Checkout repository
         if: env.CANCELJOB != 'true'
@@ -28,10 +29,9 @@ jobs:
         if: env.CANCELJOB != 'true'
         shell: bash
         run: |
-          # 获取总提交次数
           COMMIT_COUNT=$(git rev-list --count HEAD)
           BASE_VERSION=$(grep '#define MENYOO_CURRENT_VER_' Solution/source/macros.h | awk '{print $3}' | tr -d '"')
-          VERSION="v${BASE_VERSION}.${COMMIT_COUNT}"  # 生成版本号
+          VERSION="v${BASE_VERSION}.${COMMIT_COUNT}"
           echo "VERSION=${VERSION}" >> $GITHUB_ENV
           echo "Generated version: $VERSION"
 
@@ -42,14 +42,17 @@ jobs:
           BASE_VERSION=${{ env.VERSION }}
           COUNTER=0
           FINAL_VERSION=$BASE_VERSION
-          echo "Checking if tag exists:"
-          while gh release list --json tagName | jq -r '.[].tagName' | grep -q "^${FINAL_VERSION}$"; do
+
+          while gh release view "$FINAL_VERSION" &>/dev/null; do
             COUNTER=$((COUNTER + 1))
             FINAL_VERSION="${BASE_VERSION}-${COUNTER}"
-            echo "Conflict detected, incrementing version to ${FINAL_VERSION}"
+            echo "Version exists, trying: $FINAL_VERSION"
           done
-          echo "No conflicts found. Final Version: $FINAL_VERSION"
-          echo "VERSION=${FINAL_VERSION}" >> $GITHUB_ENV
+
+          echo "Final Version: $FINAL_VERSION"
+          echo "VERSION=$FINAL_VERSION" >> $GITHUB_ENV
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Check version pattern and merge
         id: check_version
@@ -57,44 +60,31 @@ jobs:
         shell: bash
         run: |
           VERSION=${{ env.VERSION }}
-          echo "Checking version pattern: $VERSION"
-
-          # 检查是否已经存在相同版本号的 PR
-          check_pr_exists() {
-            PR_LIST=$(gh pr list --head EnhancedFreecam-joy --base main --state open --json title,body)
-            PR_EXIST=$(echo "$PR_LIST" | jq -r --arg VERSION "$VERSION" '.[] | select((.title | contains($VERSION)) or (.body | contains($VERSION)))')
-            [ -n "$PR_EXIST" ]
-          }
-
-          if [[ $VERSION =~ ^v?[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "Version is a full release. Creating pull request to merge into main."
-            echo "## Check for existing PR"
-            if check_pr_exists; then
-              echo "PR already exists with version $VERSION."
-              echo "CANCELJOB=true" >> $GITHUB_ENV
-              exit 0
-            fi
-            echo "Creating new PR."
-            gh pr create --title "Release $VERSION" --body "Merging EnhancedFreecam-joy into main for release $VERSION" --base main --head EnhancedFreecam-joy
-            echo "CANCELJOB=true" >> $GITHUB_ENV
-            exit 0
-          elif [[ $VERSION =~ ^v?[0-9]+\.[0-9]+\.[0-9]+(a|b|rc)[0-9]+$ ]]; then
-            echo "Version is a pre-release. Proceeding with pre-release build."
-          else
-            echo "Version is invalid or a development version. Cancelling workflow."
-            echo "CANCELJOB=true" >> $GITHUB_ENV
+          if [[ $GITHUB_REF == "refs/heads/main" ]]; then
+            echo "Already on main branch. Skipping merge check."
             exit 0
           fi
 
+          if [[ $VERSION =~ ^v?[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Creating PR for release $VERSION"
+            gh pr create --title "Release $VERSION" --body "Auto-merge for release" --base main --head EnhancedFreecam-joy
+            echo "CANCELJOB=true" >> $GITHUB_ENV
+          elif [[ ! $VERSION =~ ^v?[0-9]+\.[0-9]+\.[0-9]+(a|b|rc)[0-9]+$ ]]; then
+            echo "Invalid version format. Cancelling workflow."
+            echo "CANCELJOB=true" >> $GITHUB_ENV
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Set output
         id: set_output
-        if: env.CANCELJOB != 'true'
         run: echo "CANCELJOB=${{ env.CANCELJOB }}" >> $GITHUB_OUTPUT
 
   build:
     if: github.ref == 'refs/heads/EnhancedFreecam-joy' && needs.check-version-and-merge.outputs.CANCELJOB != 'true'
     runs-on: windows-latest
     needs: check-version-and-merge
+
     steps:
       - uses: actions/checkout@v3
         with:
@@ -104,10 +94,9 @@ jobs:
         uses: microsoft/setup-msbuild@v1.1
 
       - name: Build
-        working-directory: ${{env.GITHUB_WORKSPACE}}
-        run: msbuild /m /p:Configuration=${{env.BUILD_CONFIGURATION}} ${{env.SOLUTION_FILE_PATH}} -verbosity:minimal
+        run: msbuild /m /p:Configuration=${{env.BUILD_CONFIGURATION}} ${{env.SOLUTION_FILE_PATH}}
 
-      - name: Upload a Build Artifact
+      - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: MenyooSP-${{ env.VERSION }}
@@ -116,42 +105,28 @@ jobs:
             !Solution/source/_Build/bin/Release/Trash/
             !Solution/source/_Build/bin/Release/*.map
 
-      - name: Cancel Workflow Action if build fails
-        uses: vishnudxb/cancel-workflow@v1.2
-        if: failure()
-        with:
-          repo: lucienlmy/MenyooSP-ItsJustCurtis
-          workflow_id: ${{ github.run_id }}
-          access_token: ${{ github.token }}
-
   release:
     needs: build
-    permissions: write-all
-    name: "Release"
-    runs-on: windows-latest
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v3
+
       - uses: actions/download-artifact@v4
-
-      - name: Extract version from macros.h and commit count
-        id: extract_version
-        shell: bash
-        run: |
-          # 在 release 阶段重新获取提交次数
-          COMMIT_COUNT=$(git rev-list --count HEAD)
-          BASE_VERSION=$(grep '#define MENYOO_CURRENT_VER_' Solution/source/macros.h | awk '{print $3}' | tr -d '"')
-          VERSION="v${BASE_VERSION}.${COMMIT_COUNT}"  # 根据提交次数生成版本号
-          FINAL_VERSION=$(echo $VERSION | sed 's/a\([0-9]*\)\.\([0-9]*\)/a\1-\2/')
-          echo "VERSION=${FINAL_VERSION}" >> $GITHUB_ENV
-          echo "Final Version for release: $FINAL_VERSION"
-
-      - name: Zip artifact for deployment
-        run: Compress-Archive -Path "Solution/source/_Build/bin/Release/*" -DestinationPath "MenyooSP-${{ env.VERSION }}.zip"
+        with:
+          name: MenyooSP-${{ needs.check-version-and-merge.outputs.VERSION }}
 
       - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ needs.check-version-and-merge.outputs.VERSION }}
+          name: "MenyooSP ${{ needs.check-version-and-merge.outputs.VERSION }}"
+          body: "Auto-generated release for EnhancedFreecam build"
+          files: |
+            Solution/source/_Build/bin/Release/*.dll
+            Solution/source/_Build/bin/Release/*.asi
+          fail_on_unmatched_tags: true  # 关键配置：禁止覆盖已有标签
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh release create "${{ env.VERSION }}" "MenyooSP-${{ env.VERSION }}.zip" \
-            --title "${{ env.VERSION }}" \
-            --generate-notes
