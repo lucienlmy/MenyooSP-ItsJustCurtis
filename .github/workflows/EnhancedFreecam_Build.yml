@@ -18,85 +18,79 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       CANCELJOB: ${{ steps.set_output.outputs.CANCELJOB }}
+      VERSION: ${{ steps.set_version.outputs.VERSION }}  # 新增输出
 
     steps:
       - name: Checkout repository
-        if: env.CANCELJOB != 'true'
         uses: actions/checkout@v3
 
-      - name: Calculate Version with Commit Count
-        id: calculate_version
-        if: env.CANCELJOB != 'true'
+      - name: Calculate Version
+        id: set_version  # 改为输出变量
         shell: bash
         run: |
           COMMIT_COUNT=$(git rev-list --count HEAD)
           BASE_VERSION=$(grep '#define MENYOO_CURRENT_VER_' Solution/source/macros.h | awk '{print $3}' | tr -d '"')
           VERSION="v${BASE_VERSION}.${COMMIT_COUNT}"
-          echo "VERSION=${VERSION}" >> $GITHUB_ENV
-          echo "Generated version: $VERSION"
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT  # 输出到步骤
+          echo "VERSION=${VERSION}" >> $GITHUB_ENV    # 同时写入环境变量
 
-      - name: Check if tag already exists and increment version
-        if: env.CANCELJOB != 'true'
+      - name: Check and increment version
         shell: bash
         run: |
-          BASE_VERSION=${{ env.VERSION }}
+          BASE_VERSION=${{ steps.set_version.outputs.version }}
           COUNTER=0
           FINAL_VERSION=$BASE_VERSION
 
           while gh release view "$FINAL_VERSION" &>/dev/null; do
             COUNTER=$((COUNTER + 1))
             FINAL_VERSION="${BASE_VERSION}-${COUNTER}"
-            echo "Version exists, trying: $FINAL_VERSION"
           done
 
-          echo "Final Version: $FINAL_VERSION"
-          echo "VERSION=$FINAL_VERSION" >> $GITHUB_ENV
+          echo "FINAL_VERSION=${FINAL_VERSION}" >> $GITHUB_ENV
+          echo "version=${FINAL_VERSION}" >> $GITHUB_OUTPUT  # 更新输出
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Check version pattern and merge
-        id: check_version
-        if: env.CANCELJOB != 'true'
-        shell: bash
+      - name: Version validation
         run: |
-          VERSION=${{ env.VERSION }}
-          if [[ $GITHUB_REF == "refs/heads/main" ]]; then
-            echo "Already on main branch. Skipping merge check."
-            exit 0
-          fi
-
-          if [[ $VERSION =~ ^v?[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "Creating PR for release $VERSION"
-            gh pr create --title "Release $VERSION" --body "Auto-merge for release" --base main --head EnhancedFreecam-joy
+          if [[ ${{ env.FINAL_VERSION }} =~ ^v?[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            gh pr create --title "Release ${{ env.FINAL_VERSION }}" \
+              --body "Auto-merge for release" \
+              --base main \
+              --head EnhancedFreecam-joy
             echo "CANCELJOB=true" >> $GITHUB_ENV
-          elif [[ ! $VERSION =~ ^v?[0-9]+\.[0-9]+\.[0-9]+(a|b|rc)[0-9]+$ ]]; then
-            echo "Invalid version format. Cancelling workflow."
-            echo "CANCELJOB=true" >> $GITHUB_ENV
+          elif [[ ! ${{ env.FINAL_VERSION }} =~ ^v?[0-9]+\.[0-9]+\.[0-9]+(a|b|rc)[0-9]+$ ]]; then
+            echo "Invalid version format" >&2
+            exit 1
           fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Set output
+      - name: Set job outputs
         id: set_output
-        run: echo "CANCELJOB=${{ env.CANCELJOB }}" >> $GITHUB_OUTPUT
+        run: |
+          echo "CANCELJOB=${{ env.CANCELJOB }}" >> $GITHUB_OUTPUT
+          echo "version=${{ env.FINAL_VERSION }}" >> $GITHUB_OUTPUT
 
   build:
-    if: github.ref == 'refs/heads/EnhancedFreecam-joy' && needs.check-version-and-merge.outputs.CANCELJOB != 'true'
+    if: needs.check-version-and-merge.outputs.CANCELJOB != 'true'
     runs-on: windows-latest
     needs: check-version-and-merge
+    env:
+      VERSION: ${{ needs.check-version-and-merge.outputs.VERSION }}  # 接收版本
 
     steps:
       - uses: actions/checkout@v3
         with:
           submodules: recursive
 
-      - name: Add MSBuild to PATH
+      - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v1.1
 
-      - name: Build
+      - name: Build solution
         run: msbuild /m /p:Configuration=${{env.BUILD_CONFIGURATION}} ${{env.SOLUTION_FILE_PATH}}
 
-      - name: Upload Artifact
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: MenyooSP-${{ env.VERSION }}
@@ -107,26 +101,24 @@ jobs:
 
   release:
     needs: build
-    permissions:
-      contents: write
     runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ needs.check-version-and-merge.outputs.VERSION }}  # 统一版本来源
 
     steps:
-      - uses: actions/checkout@v3
-
       - uses: actions/download-artifact@v4
         with:
-          name: MenyooSP-${{ needs.check-version-and-merge.outputs.VERSION }}
+          name: MenyooSP-${{ env.VERSION }}
 
-      - name: Create Release
+      - name: Create release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: ${{ needs.check-version-and-merge.outputs.VERSION }}
-          name: "MenyooSP ${{ needs.check-version-and-merge.outputs.VERSION }}"
-          body: "Auto-generated release for EnhancedFreecam build"
+          tag_name: ${{ env.VERSION }}
+          name: "MenyooSP ${{ env.VERSION }}"
+          body: "Automated release"
           files: |
             Solution/source/_Build/bin/Release/*.dll
             Solution/source/_Build/bin/Release/*.asi
-          fail_on_unmatched_tags: true  # 关键配置：禁止覆盖已有标签
+          fail_on_unmatched_tags: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
