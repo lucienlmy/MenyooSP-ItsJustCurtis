@@ -171,7 +171,7 @@ inline void MenyooMain()
 	g_MenyooConfigTick = GetTickCount();
 	g_FaderTick = GetTickCount();
 
-	if (!NETWORK_IS_SESSION_STARTED())2
+	if (!NETWORK_IS_SESSION_STARTED())
 	{
 		if (GTAmemory::FindShopController())
 			GeneralGlobalHax::EnableBlockedMpVehiclesInSp();
