@@ -83,27 +83,20 @@ jobs:
             exit 0
           fi
 
-          # Improved PR check function
-          check_pr_exists() {
-            PR_LIST=$(gh pr list --head EnhancedFreecam-joy --base main --state open --json title,body,number)
-            echo "Current PRs: $PR_LIST"
-            PR_EXISTS=$(echo "$PR_LIST" | jq -r --arg VERSION "$VERSION" '.[] | select((.title | contains($VERSION)) or (.body | contains($VERSION)))')
-            if [ -n "$PR_EXISTS" ]; then
-              echo "Found existing PR with version $VERSION:"
-              echo "$PR_EXISTS"
-              return 0
-            else
-              return 1
-            fi
-          }
+          # 检查是否存在相同版本的PR
+          PR_EXISTS=$(gh pr list --head EnhancedFreecam-joy --base main --state open --json number,title,body \
+            | jq -r --arg VERSION "$VERSION" '.[] | select((.title | contains($VERSION)) or (.body | contains($VERSION))) | .number')
 
-          # Enhanced version pattern matching
           if [[ $VERSION =~ ^v[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then
             echo "Version $VERSION is a full release format"
-            if check_pr_exists; then
-              echo "PR already exists with version $VERSION"
-              echo "CANCELJOB=true" >> $GITHUB_ENV
-              exit 0
+            
+            if [ -n "$PR_EXISTS" ]; then
+              echo "Found existing PR #$PR_EXISTS for version $VERSION"
+              # 更新现有PR
+              gh pr edit $PR_EXISTS \
+                --title "Release $VERSION" \
+                --body "Merging EnhancedFreecam-joy into main for release $VERSION"
+              echo "Updated existing PR #$PR_EXISTS"
             else
               echo "Creating new PR for version $VERSION"
               gh pr create \
@@ -111,9 +104,9 @@ jobs:
                 --body "Merging EnhancedFreecam-joy into main for release $VERSION" \
                 --base main \
                 --head EnhancedFreecam-joy
-              echo "CANCELJOB=true" >> $GITHUB_ENV
-              exit 0
             fi
+            echo "CANCELJOB=true" >> $GITHUB_ENV
+            exit 0
           elif [[ $VERSION =~ ^v[0-9]+\.[0-9]+\.[0-9]+(a|b|rc)[0-9]+$ ]]; then
             echo "Version $VERSION is a pre-release format"
           else
@@ -239,19 +232,45 @@ jobs:
         id: get_commits
         shell: pwsh
         run: |
-          # 获取从上一个标签到当前的所有提交
-          $commits = git log $(git describe --tags --abbrev=0 2>$null || echo HEAD^)..HEAD --pretty=format:"- %h: %s (%an)" --no-merges
+          # 确保完整克隆
+          git fetch --prune --unshallow
           
-          # 如果没有找到之前的标签，则获取最近的10个提交
-          if (-not $commits) {
-            $commits = git log -10 --pretty=format:"- %h: %s (%an)" --no-merges
+          # 获取本次推送的提交范围
+          $beforeSha = "${{ github.event.before }}"
+          $afterSha = "${{ github.event.after }}"
+          
+          Write-Host "获取从 $beforeSha 到 $afterSha 的提交"
+          
+          # 获取本次推送的所有提交
+          $commits = git rev-list --reverse "$beforeSha..$afterSha"
+          $formattedCommits = @()
+          
+          foreach ($commit in $commits) {
+              # 获取单个提交的详细信息
+              $hash = git rev-parse --short=7 $commit
+              $message = git log -1 --format="%s" $commit
+              $author = git log -1 --format="%an" $commit
+              
+              # 格式化提交信息
+              $formattedCommits += "- ${hash}: ${message} (${author})"
           }
           
-          # 将提交信息设置为输出变量
-          $commitMessage = $commits -join "`n"
+          if ($formattedCommits.Count -eq 0) {
+              Write-Host "未找到提交，使用最新提交"
+              $hash = git rev-parse --short=7 HEAD
+              $message = git log -1 --format="%s" HEAD
+              $author = git log -1 --format="%an" HEAD
+              $formattedCommits += "- ${hash}: ${message} (${author})"
+          }
+          
+          # 将提交信息写入输出
+          $commitMessage = $formattedCommits -join "`n"
           echo "commit_message<<EOF" >> $env:GITHUB_OUTPUT
           echo "$commitMessage" >> $env:GITHUB_OUTPUT
           echo "EOF" >> $env:GITHUB_OUTPUT
+          
+          Write-Host "本次推送的提交:"
+          Write-Host $commitMessage
 
       - name: Create GitHub release
         id: create_release
@@ -260,12 +279,17 @@ jobs:
           tag_name: ${{ env.VERSION }}
           name: "MenyooSP ${{ env.VERSION }}"
           body: |
-            版本: ${{ env.VERSION }}
-            
-            更新内容:
+            # 版本发布说明:
+
+            ## 更新内容
             ${{ steps.get_commits.outputs.commit_message }}
             
-            完整更新日志请查看: https://github.com/${{ github.repository }}/commits/${{ github.sha }}
+            ## 其他信息
+            - 发布时间: ${{ format(github.event.head_commit.timestamp, 'yyyy-MM-dd HH:mm:ss') }}
+            - 分支: ${{ github.ref_name }}
+            - 构建: [Workflow Run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+            
+            完整更新日志: https://github.com/${{ github.repository }}/commits/${{ github.sha }}
           prerelease: ${{ contains(env.VERSION, 'a') || contains(env.VERSION, 'b') || contains(env.VERSION, 'rc') }}
           files: MenyooSP-${{ env.VERSION }}.zip
         env:
