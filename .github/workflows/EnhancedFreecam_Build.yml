@@ -76,54 +76,37 @@ jobs:
         shell: bash
         run: |
           VERSION=${{ env.VERSION }}
-          echo "Final version check for: $VERSION"
+          echo "检查版本格式: $VERSION"
           
           if [[ $GITHUB_REF == "refs/heads/main" ]]; then
-            echo "Already on main branch. Skipping merge check."
+            echo "主分支，跳过检查"
             exit 0
           fi
 
-          # 检查是否存在相同版本的PR
-          PR_EXISTS=$(gh pr list --head EnhancedFreecam-joy --base main --state open --json number,title,body \
-            | jq -r --arg VERSION "$VERSION" '.[] | select((.title | contains($VERSION)) or (.body | contains($VERSION))) | .number')
+          # 支持以下版本格式:
+          # v2.1.4         - 标准版本
+          # v2.1.4.123    - 带构建号的版本
+          # v2.1.4a1      - 预发布版本
+          # v2.1.4a1.123  - 带构建号的预发布版本
+          if [[ $VERSION =~ ^v[0-9]+\.[0-9]+\.[0-9]+((a|b|rc)[0-9]+)?(\.[0-9]+)?$ ]]; then
+            echo "版本格式有效: $VERSION"
+            
+            # 检查并创建PR的逻辑
+            PR_EXISTS=$(gh pr list --head EnhancedFreecam-joy --base main --state open --json number,title \
+              | jq -r --arg VERSION "$VERSION" '.[] | select(.title | contains($VERSION)) | .number')
 
-          if [[ $VERSION =~ ^v[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then
-            echo "Version $VERSION is a full release format"
-            
-            if [ -n "$PR_EXISTS" ]; then
-              echo "Found existing PR #$PR_EXISTS for version $VERSION"
-              # 更新现有PR
-              gh pr edit $PR_EXISTS \
+            if [ -z "$PR_EXISTS" ]; then
+              echo "创建新的PR..."
+              gh pr create \
                 --title "Release $VERSION" \
-                --body "Merging EnhancedFreecam-joy into main for release $VERSION" \
-                --base main
-              echo "Updated existing PR #$PR_EXISTS"
-              
-              # 合并现有PR
-              gh pr merge $PR_EXISTS --merge
-              echo "Merged PR #$PR_EXISTS"
-            else
-              echo "Creating new PR for version $VERSION"
-              # 创建新的PR
-              PR_NUMBER=$(gh pr create \
-                --title "Release $VERSION" \
-                --body "Merging EnhancedFreecam-joy into main for release $VERSION" \
+                --body "从 EnhancedFreecam-joy 合并到 main 分支，发布版本 $VERSION" \
                 --base main \
-                --head EnhancedFreecam-joy)
-              
-              # 合并新创建的PR
-              gh pr merge $PR_NUMBER --merge
-              echo "Merged PR #$PR_NUMBER"
+                --head EnhancedFreecam-joy
+            else
+              echo "PR已存在: #$PR_EXISTS"
             fi
-            
-            echo "CANCELJOB=true" >> $GITHUB_ENV
-            exit 0
-          elif [[ $VERSION =~ ^v[0-9]+\.[0-9]+\.[0-9]+(a|b|rc)[0-9]+$ ]]; then
-            echo "Version $VERSION is a pre-release format"
           else
-            echo "Version $VERSION is invalid or development version"
-            echo "CANCELJOB=true" >> $GITHUB_ENV
-            exit 0
+            echo "警告：版本格式不标准，但继续执行: $VERSION"
           fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
