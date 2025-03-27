@@ -83,27 +83,20 @@ jobs:
             exit 0
           fi
 
-          # Improved PR check function
-          check_pr_exists() {
-            PR_LIST=$(gh pr list --head EnhancedFreecam-joy --base main --state open --json title,body,number)
-            echo "Current PRs: $PR_LIST"
-            PR_EXISTS=$(echo "$PR_LIST" | jq -r --arg VERSION "$VERSION" '.[] | select((.title | contains($VERSION)) or (.body | contains($VERSION)))')
-            if [ -n "$PR_EXISTS" ]; then
-              echo "Found existing PR with version $VERSION:"
-              echo "$PR_EXISTS"
-              return 0
-            else
-              return 1
-            fi
-          }
+          # 检查是否存在相同版本的PR
+          PR_EXISTS=$(gh pr list --head EnhancedFreecam-joy --base main --state open --json number,title,body \
+            | jq -r --arg VERSION "$VERSION" '.[] | select((.title | contains($VERSION)) or (.body | contains($VERSION))) | .number')
 
-          # Enhanced version pattern matching
           if [[ $VERSION =~ ^v[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then
             echo "Version $VERSION is a full release format"
-            if check_pr_exists; then
-              echo "PR already exists with version $VERSION"
-              echo "CANCELJOB=true" >> $GITHUB_ENV
-              exit 0
+            
+            if [ -n "$PR_EXISTS" ]; then
+              echo "Found existing PR #$PR_EXISTS for version $VERSION"
+              # 更新现有PR
+              gh pr edit $PR_EXISTS \
+                --title "Release $VERSION" \
+                --body "Merging EnhancedFreecam-joy into main for release $VERSION"
+              echo "Updated existing PR #$PR_EXISTS"
             else
               echo "Creating new PR for version $VERSION"
               gh pr create \
@@ -111,9 +104,9 @@ jobs:
                 --body "Merging EnhancedFreecam-joy into main for release $VERSION" \
                 --base main \
                 --head EnhancedFreecam-joy
-              echo "CANCELJOB=true" >> $GITHUB_ENV
-              exit 0
             fi
+            echo "CANCELJOB=true" >> $GITHUB_ENV
+            exit 0
           elif [[ $VERSION =~ ^v[0-9]+\.[0-9]+\.[0-9]+(a|b|rc)[0-9]+$ ]]; then
             echo "Version $VERSION is a pre-release format"
           else
@@ -239,11 +232,21 @@ jobs:
         id: get_commits
         shell: pwsh
         run: |
-          # 获取从上一个标签到当前的所有提交
-          $commits = git log $(git describe --tags --abbrev=0 2>$null || echo HEAD^)..HEAD --pretty=format:"- %h: %s (%an)" --no-merges
+          # 获取最后一个标签
+          $lastTag = git describe --tags --abbrev=0 2>$null
           
-          # 如果没有找到之前的标签，则获取最近的10个提交
+          if ($lastTag) {
+            Write-Host "找到最后一个标签: $lastTag"
+            # 获取从上一个标签到当前的所有提交
+            $commits = git log "$lastTag..HEAD" --pretty=format:"- %h: %s (%an)" --no-merges
+          } else {
+            Write-Host "未找到标签，获取所有提交"
+            # 如果没有标签，获取所有提交
+            $commits = git log --pretty=format:"- %h: %s (%an)" --no-merges
+          }
+          
           if (-not $commits) {
+            Write-Host "未找到任何提交，使用最近的提交"
             $commits = git log -10 --pretty=format:"- %h: %s (%an)" --no-merges
           }
           
