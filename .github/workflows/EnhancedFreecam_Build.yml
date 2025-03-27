@@ -139,9 +139,9 @@ jobs:
             sudo apt install gh -y
           fi
 
-          # 检查是否已存在PR
+          # 修复 jq 语法并检查是否已存在PR
           PR_EXISTS=$(gh pr list --head EnhancedFreecam-joy --base main --state open --json number,title \
-            | jq -r --arg VERSION "$VERSION" '.[] | select(..title | contains($VERSION)) | .number')
+            | jq -r --arg VERSION "$VERSION" '.[] | select(.title | contains($VERSION)) | .number')
 
           if [ -z "$PR_EXISTS" ]; then
             echo "创建新的PR..."
@@ -149,17 +149,16 @@ jobs:
               --title "Release $VERSION" \
               --body "从 EnhancedFreecam-joy 合并到 main 分支，发布版本 $VERSION" \
               --base main \
-              --head EnhancedFreecam-joy
+              --head EnhancedFreecam-joy || true
             
-            echo "PR已创建"
+            echo "PR已创建或已存在"
           else
             echo "已存在PR #$PR_EXISTS，尝试合并"
-            # 尝试自动合并PR
-            if gh pr merge $PR_EXISTS --auto --squash; then
-              echo "PR #$PR_EXISTS 已成功合并"
-            else
+            # 尝试自动合并PR，如果失败则继续执行
+            gh pr merge $PR_EXISTS --auto --squash || {
               echo "警告: PR #$PR_EXISTS 无法自动合并,可能存在冲突,继续执行工作流"
-            fi
+              true
+            }
           fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
