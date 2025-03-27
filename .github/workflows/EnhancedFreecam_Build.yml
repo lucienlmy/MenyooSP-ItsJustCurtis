@@ -71,7 +71,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Check version pattern and merge
-        id: check_version
+        id: check_version 
         if: env.CANCELJOB != 'true'
         shell: bash
         run: |
@@ -91,7 +91,7 @@ jobs:
           if [[ $VERSION =~ ^v[0-9]+\.[0-9]+\.[0-9]+((a|b|rc)[0-9]+)?(\.[0-9]+)?$ ]]; then
             echo "版本格式有效: $VERSION"
             
-            # 检查并创建PR的逻辑
+            # 检查是否存在PR并尝试合并
             PR_EXISTS=$(gh pr list --head EnhancedFreecam-joy --base main --state open --json number,title \
               | jq -r --arg VERSION "$VERSION" '.[] | select(.title | contains($VERSION)) | .number')
 
@@ -101,13 +101,17 @@ jobs:
                 --title "Release $VERSION" \
                 --body "从 EnhancedFreecam-joy 合并到 main 分支，发布版本 $VERSION" \
                 --base main \
-                --head EnhancedFreecam-joy
+                --head EnhancedFreecam-joy || echo "PR创建失败，可能已存在"
             else
-              echo "PR已存在: #$PR_EXISTS"
+              echo "已存在PR #$PR_EXISTS，尝试合并"
+              # 尝试合并现有PR
+              gh pr merge $PR_EXISTS --auto --squash || echo "PR #$PR_EXISTS 目前无法合并，继续执行"
             fi
           else
             echo "警告：版本格式不标准，但继续执行: $VERSION"
           fi
+          # 总是返回成功
+          exit 0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
