@@ -15,7 +15,7 @@
 namespace DxHookIMG {
 	class DxTexture;
 }
-
+//速度
 namespace sub
 {
 	namespace FolderPreviewBmps_catind
