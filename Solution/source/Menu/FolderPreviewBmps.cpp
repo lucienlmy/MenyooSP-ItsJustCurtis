@@ -24,7 +24,7 @@
 #include <string>
 #include <vector>
 #include <algorithm>
-
+//123
 namespace sub
 {
 	namespace FolderPreviewBmps_catind
