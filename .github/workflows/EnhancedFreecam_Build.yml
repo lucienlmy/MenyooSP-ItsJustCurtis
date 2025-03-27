@@ -118,8 +118,8 @@ jobs:
           echo "CANCELJOB=${{ env.CANCELJOB }}" >> $GITHUB_OUTPUT
           echo "version=${{ env.VERSION }}" >> $GITHUB_OUTPUT
 
-      - name: Check version and create PR
-        id: check_version
+      - name: Check version and merge PR
+        id: check_version2
         if: env.CANCELJOB != 'true'
         shell: bash
         run: |
@@ -137,11 +137,10 @@ jobs:
 
           # 检查是否已存在PR
           PR_EXISTS=$(gh pr list --head EnhancedFreecam-joy --base main --state open --json number,title \
-            | jq -r --arg VERSION "$VERSION" '.[] | select(.title | contains($VERSION)) | .number')
+            | jq -r --arg VERSION "$VERSION" '.[] | select(..title | contains($VERSION)) | .number')
 
           if [ -z "$PR_EXISTS" ]; then
             echo "创建新的PR..."
-            # 移除了 --label 选项
             gh pr create \
               --title "Release $VERSION" \
               --body "从 EnhancedFreecam-joy 合并到 main 分支，发布版本 $VERSION" \
@@ -150,7 +149,13 @@ jobs:
             
             echo "PR已创建"
           else
-            echo "已存在PR #$PR_EXISTS，跳过创建"
+            echo "已存在PR #$PR_EXISTS，尝试合并"
+            # 尝试自动合并PR
+            if gh pr merge $PR_EXISTS --auto --squash; then
+              echo "PR #$PR_EXISTS 已成功合并"
+            else
+              echo "警告: PR #$PR_EXISTS 无法自动合并,可能存在冲突,继续执行工作流"
+            fi
           fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
