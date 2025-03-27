@@ -136,7 +136,7 @@ jobs:
           echo "version=${{ env.VERSION }}" >> $GITHUB_OUTPUT
 
       - name: Check version and create PR
-        id: check_version
+        id: check_version2
         if: env.CANCELJOB != 'true'
         shell: bash
         run: |
