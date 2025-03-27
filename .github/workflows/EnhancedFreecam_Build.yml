@@ -141,12 +141,12 @@ jobs:
 
           if [ -z "$PR_EXISTS" ]; then
             echo "创建新的PR..."
+            # 移除了 --label 选项
             gh pr create \
               --title "Release $VERSION" \
               --body "从 EnhancedFreecam-joy 合并到 main 分支，发布版本 $VERSION" \
               --base main \
-              --head EnhancedFreecam-joy \
-              --label "release"
+              --head EnhancedFreecam-joy
             
             echo "PR已创建"
           else
