@@ -135,6 +135,44 @@ jobs:
           echo "CANCELJOB=${{ env.CANCELJOB }}" >> $GITHUB_OUTPUT
           echo "version=${{ env.VERSION }}" >> $GITHUB_OUTPUT
 
+      - name: Check version and create PR
+        id: check_version
+        if: env.CANCELJOB != 'true'
+        shell: bash
+        run: |
+          VERSION=${{ env.VERSION }}
+          echo "检查版本: $VERSION"
+          
+          # 确保已安装GitHub CLI
+          if ! command -v gh &> /dev/null; then
+            echo "正在安装GitHub CLI..."
+            curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+            echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+            sudo apt update
+            sudo apt install gh -y
+          fi
+
+          # 检查是否已存在PR
+          PR_EXISTS=$(gh pr list --head EnhancedFreecam-joy --base main --state open --json number,title \
+            | jq -r --arg VERSION "$VERSION" '.[] | select(.title | contains($VERSION)) | .number')
+
+          if [ -z "$PR_EXISTS" ]; then
+            echo "创建新的PR..."
+            gh pr create \
+              --title "Release $VERSION" \
+              --body "从 EnhancedFreecam-joy 合并到 main 分支，发布版本 $VERSION" \
+              --base main \
+              --head EnhancedFreecam-joy \
+              --label "release"
+            
+            echo "PR已创建"
+          else
+            echo "已存在PR #$PR_EXISTS，跳过创建"
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   build:
     if: github.ref == 'refs/heads/EnhancedFreecam-joy' && needs.check-version-and-merge.outputs.CANCELJOB != 'true'
     runs-on: windows-latest
