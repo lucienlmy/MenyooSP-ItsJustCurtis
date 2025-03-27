@@ -95,16 +95,27 @@ jobs:
               # 更新现有PR
               gh pr edit $PR_EXISTS \
                 --title "Release $VERSION" \
-                --body "Merging EnhancedFreecam-joy into main for release $VERSION"
+                --body "Merging EnhancedFreecam-joy into main for release $VERSION" \
+                --base main
               echo "Updated existing PR #$PR_EXISTS"
+              
+              # 合并现有PR
+              gh pr merge $PR_EXISTS --merge
+              echo "Merged PR #$PR_EXISTS"
             else
               echo "Creating new PR for version $VERSION"
-              gh pr create \
+              # 创建新的PR
+              PR_NUMBER=$(gh pr create \
                 --title "Release $VERSION" \
                 --body "Merging EnhancedFreecam-joy into main for release $VERSION" \
                 --base main \
-                --head EnhancedFreecam-joy
+                --head EnhancedFreecam-joy)
+              
+              # 合并新创建的PR
+              gh pr merge $PR_NUMBER --merge
+              echo "Merged PR #$PR_NUMBER"
             fi
+            
             echo "CANCELJOB=true" >> $GITHUB_ENV
             exit 0
           elif [[ $VERSION =~ ^v[0-9]+\.[0-9]+\.[0-9]+(a|b|rc)[0-9]+$ ]]; then
