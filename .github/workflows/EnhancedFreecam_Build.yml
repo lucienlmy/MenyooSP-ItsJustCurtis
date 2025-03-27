@@ -232,29 +232,38 @@ jobs:
         id: get_commits
         shell: pwsh
         run: |
-          # 获取最后一个标签
-          $lastTag = git describe --tags --abbrev=0 2>$null
+          # 获取所有待发布的提交
+          # 首先确保已经拉取了所有标签和历史
+          git fetch --prune --unshallow --tags
           
-          if ($lastTag) {
-            Write-Host "找到最后一个标签: $lastTag"
-            # 获取从上一个标签到当前的所有提交
-            $commits = git log "$lastTag..HEAD" --pretty=format:"- %h: %s (%an)" --no-merges
-          } else {
-            Write-Host "未找到标签，获取所有提交"
-            # 如果没有标签，获取所有提交
-            $commits = git log --pretty=format:"- %h: %s (%an)" --no-merges
-          }
+          # 获取最近的标签和当前提交之间的所有提交
+          $commits = git log --pretty=format:"- %h: %s (%an)" --no-merges HEAD...$(git describe --tags --abbrev=0 2>$null)
           
           if (-not $commits) {
-            Write-Host "未找到任何提交，使用最近的提交"
+            Write-Host "未找到标签之间的提交，获取最近10个提交"
             $commits = git log -10 --pretty=format:"- %h: %s (%an)" --no-merges
           }
           
-          # 将提交信息设置为输出变量
-          $commitMessage = $commits -join "`n"
+          # 格式化提交信息
+          $formattedCommits = $commits | ForEach-Object {
+            if ($_ -match '^- ([a-f0-9]+): (.+) \((.+)\)$') {
+              "- [`$($matches[1])`](https://github.com/${{ github.repository }}/commit/$($matches[1])) $($matches[2]) by $($matches[3])"
+            } else {
+              $_
+            }
+          }
+          
+          # 将格式化后的提交信息合并为字符串
+          $commitMessage = $formattedCommits -join "`n"
+          
+          # 设置输出变量
           echo "commit_message<<EOF" >> $env:GITHUB_OUTPUT
           echo "$commitMessage" >> $env:GITHUB_OUTPUT
           echo "EOF" >> $env:GITHUB_OUTPUT
+          
+          # 显示调试信息
+          Write-Host "找到的提交:"
+          Write-Host $commitMessage
 
       - name: Create GitHub release
         id: create_release
@@ -263,12 +272,17 @@ jobs:
           tag_name: ${{ env.VERSION }}
           name: "MenyooSP ${{ env.VERSION }}"
           body: |
-            版本: ${{ env.VERSION }}
+            # 版本发布说明: ${{ env.VERSION }}
             
-            更新内容:
+            ## 更新内容
             ${{ steps.get_commits.outputs.commit_message }}
             
-            完整更新日志请查看: https://github.com/${{ github.repository }}/commits/${{ github.sha }}
+            ## 其他信息
+            - 发布时间: $(date +'%Y-%m-%d %H:%M:%S')
+            - 分支: ${{ github.ref_name }}
+            - 构建: [Workflow Run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+            
+            完整更新日志: https://github.com/${{ github.repository }}/commits/${{ github.sha }}
           prerelease: ${{ contains(env.VERSION, 'a') || contains(env.VERSION, 'b') || contains(env.VERSION, 'rc') }}
           files: MenyooSP-${{ env.VERSION }}.zip
         env:
