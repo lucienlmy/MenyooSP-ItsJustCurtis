@@ -316,6 +316,9 @@ jobs:
             ## 更新内容
             ${{ steps.get_commits.outputs.commit_message }}
             
+            ## 提交详情
+            ${{ github.event.head_commit.message }}
+            
             ## 其他信息
             - 发布时间: ${{ format(github.event.head_commit.timestamp, 'yyyy-MM-dd HH:mm:ss') }}
             - 分支: ${{ github.ref_name }}
