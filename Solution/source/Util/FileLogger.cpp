@@ -1,4 +1,4 @@
-/*
+﻿/*
 * Menyoo PC - Grand Theft Auto V single-player trainer mod
 * Copyright (C) 2019  MAFINS
 *
@@ -14,6 +14,8 @@
 #include <fstream>
 #include <iomanip>
 #include <time.h>
+#include <map>
+#include <set>
 #include "../Natives/natives.h"
 #include "../Menu/Menu.h"
 #include "../Menu/MenuConfig.h"
@@ -22,6 +24,15 @@ namespace ige
 {
 	FileLogger menyooLogObject("menyooLog.txt");
 	std::ofstream& myLog = menyooLogObject.myFile;
+
+    // 添加一个集合来追踪已记录的错误
+    static std::set<std::string> logged_errors;
+
+    struct ErrorCount {
+        int count;
+        time_t first_occurrence; 
+    };
+    static std::map<std::string, ErrorCount> error_counts;
 
 	FileLogger::FileLogger(std::string fname)
 	{
@@ -53,13 +64,78 @@ namespace ige
 
 	}
 
-	void addlog(LogType logType, std::string message, std::string filename, int loglevel)
-	{
-		if (static_cast<int>(logType) <= loglevel)
-		{
-			ige::myLog << logType << (loglevel >= 3 ? filename : "") << ": " << message << std::endl;
-		}
-	}
+    // 翻译表结构
+    struct TranslationEntry {
+        std::string original;
+        std::string translated;
+        bool hasTranslation;
+    };
+    
+    // 翻译表管理
+    static std::map<std::string, TranslationEntry> translation_table;
+    
+    // 用于控制日志输出频率
+    struct LogControl {
+        int threshold;      // 输出阈值
+        int interval;       // 输出间隔
+        time_t cooldown;    // 冷却时间(秒)
+    };
+    static LogControl log_control = {100, 1000, 3600}; // 默认值
+    
+    void addlog(LogType logType, std::string message, std::string filename, int loglevel) 
+    {
+        // 对翻译错误的特殊处理
+        if(message.find("Translate string out of range:") == 0) {
+            std::string key = message.substr(27); // 提取需要翻译的文本
+            
+            auto& entry = translation_table[key];
+            if(!entry.hasTranslation) {
+                entry.original = key;
+                entry.translated = key; // 使用原文作为默认翻译
+                entry.hasTranslation = true;
+                
+                // 只在首次遇到未翻译文本时记录
+                ige::myLog << LogType::LOG_WARNING 
+                          << ": New untranslated string: " << key << std::endl;
+            }
+            
+            // 使用ErrorCount跟踪频率
+            auto& count = error_counts[key];
+            if(count.count == 0) {
+                count.first_occurrence = time(0);
+            }
+            count.count++;
+            
+            // 根据频率控制输出
+            time_t now = time(0);
+            if(count.count == 1 || 
+               (count.count % log_control.threshold == 0 && 
+                now - count.first_occurrence >= log_control.cooldown)) {
+                
+                ige::myLog << logType << (loglevel >= 3 ? filename : "")
+                          << ": Translation missing for '" << key 
+                          << "' (occurred " << count.count 
+                          << " times in " 
+                          << (now - count.first_occurrence) / 3600.0 
+                          << " hours)" << std::endl;
+            }
+            return;
+        }
+
+        // 其他类型日志的处理
+        if(static_cast<int>(logType) <= loglevel) {
+            ige::myLog << logType << (loglevel >= 3 ? filename : "") 
+                      << ": " << message << std::endl;
+        }
+    }
+
+    // 添加翻译项的辅助函数
+    void AddTranslation(const std::string& key, const std::string& value) {
+        auto& entry = translation_table[key];
+        entry.original = key;
+        entry.translated = value;
+        entry.hasTranslation = true;
+    }
 
 	//overloaded function to define default file and loglevels unless otherwise specified
 	void addlog(LogType logType, std::string& message) {
