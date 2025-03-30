@@ -1,4 +1,4 @@
-﻿/*
+/*
 * Menyoo PC - Grand Theft Auto V single-player trainer mod
 * Copyright (C) 2019  MAFINS
 *
@@ -14,8 +14,6 @@
 #include <fstream>
 #include <iomanip>
 #include <time.h>
-#include <map>
-#include <set>
 #include "../Natives/natives.h"
 #include "../Menu/Menu.h"
 #include "../Menu/MenuConfig.h"
@@ -24,14 +22,6 @@ namespace ige
 {
 	FileLogger menyooLogObject("menyooLog.txt");
 	std::ofstream& myLog = menyooLogObject.myFile;
-
-    static std::set<std::string> logged_errors;
-
-    struct ErrorCount {
-        int count;
-        time_t first_occurrence; 
-    };
-    static std::map<std::string, ErrorCount> error_counts;
 
 	FileLogger::FileLogger(std::string fname)
 	{
@@ -45,6 +35,7 @@ namespace ige
 			localtime_s(&t, &now);
 
 			myFile << "Menyoo " << MENYOO_CURRENT_VER_ << std::endl;
+			//myFile << "Player Name: " << PLAYER::GET_PLAYER_NAME(-1) << std::endl;
 			myFile << "Log file created " << std::setfill('0') << std::setw(2) << t.tm_mday << "/" << std::setfill('0') << std::setw(2) << (t.tm_mon + 1) << "/" << t.tm_year + 1900 << std::endl;
 			myFile << "Logging level " << std::to_string(g_loglevel) << " active. Edit loglevel in menyooconfig.ini to change." << std::endl << std::endl;
 		}
@@ -62,69 +53,14 @@ namespace ige
 
 	}
 
-    struct TranslationEntry {
-        std::string original;
-        std::string translated;
-        bool hasTranslation;
-    };
-    
-    static std::map<std::string, TranslationEntry> translation_table;
-    
-    struct LogControl {
-        int threshold;      // 输出阈值
-        int interval;       // 输出间隔
-        time_t cooldown;    // 冷却时间(秒)
-    };
-    static LogControl log_control = {100, 1000, 3600}; // 默认值
-    
-    void addlog(LogType logType, std::string message, std::string filename, int loglevel) 
-    {
-        if(message.find("Translate string out of range:") == 0) {
-            std::string key = message.substr(27); // 提取需要翻译的文本
-            
-            auto& entry = translation_table[key];
-            if(!entry.hasTranslation) {
-                entry.original = key;
-                entry.translated = key; // 使用原文作为默认翻译
-                entry.hasTranslation = true;
-                
-                ige::myLog << LogType::LOG_WARNING 
-                          << ": New untranslated string: " << key << std::endl;
-            }
-            
-            auto& count = error_counts[key];
-            if(count.count == 0) {
-                count.first_occurrence = time(0);
-            }
-            count.count++;
-            
-            time_t now = time(0);
-            if(count.count == 1 || 
-               (count.count % log_control.threshold == 0 && 
-                now - count.first_occurrence >= log_control.cooldown)) {
-                
-                ige::myLog << logType << (loglevel >= 3 ? filename : "")
-                          << ": Translation missing for '" << key 
-                          << "' (occurred " << count.count 
-                          << " times in " 
-                          << (now - count.first_occurrence) / 3600.0 
-                          << " hours)" << std::endl;
-            }
-            return;
-        }
+	void addlog(LogType logType, std::string message, std::string filename, int loglevel)
+	{
+		if (static_cast<int>(logType) <= loglevel)
+		{
+			ige::myLog << logType << (loglevel >= 3 ? filename : "") << ": " << message << std::endl;
+		}
+	}
 
-        if(static_cast<int>(logType) <= loglevel) {
-            ige::myLog << logType << (loglevel >= 3 ? filename : "") 
-                      << ": " << message << std::endl;
-        }
-    }
-
-    void AddTranslation(const std::string& key, const std::string& value) {
-        auto& entry = translation_table[key];
-        entry.original = key;
-        entry.translated = value;
-        entry.hasTranslation = true;
-    }
 	//overloaded function to define default file and loglevels unless otherwise specified
 	void addlog(LogType logType, std::string& message) {
 		addlog(logType, message, "", g_loglevel);
