@@ -1,4 +1,4 @@
-/*
+﻿/*
 * Menyoo PC - Grand Theft Auto V single-player trainer mod
 * Copyright (C) 2019  MAFINS
 *
@@ -16,7 +16,7 @@
 #define _CRT_SECURE_NO_WARNINGS
 
 
-#define MENYOO_CURRENT_VER_ "2.1.4a1"
+#define MENYOO_CURRENT_VER_ "2.1.4a1.1" // 2.1.4a1.alpha
 
 #define GAME_PLAYERCOUNT 30
 

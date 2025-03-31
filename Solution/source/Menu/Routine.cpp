@@ -92,7 +92,7 @@ bool defaultPedSet = false;
 
 void Menu::justopened()
 {
-	Game::Print::PrintBottomLeft(oss_ << "Menyoo PC v" << MENYOO_CURRENT_VER_ << " by ItsJustCurtis and MAFINS");
+	Game::Print::PrintBottomLeft(oss_ << "Menyoo PC v" << MENYOO_CURRENT_VER_ << "~r~羽一大魔王修改");
 
 	SET_AUDIO_FLAG("IsDirectorModeActive", true);
 
@@ -114,7 +114,7 @@ void Menu::justopened()
 		IS_DLC_PRESENT(GET_HASH_KEY("mp2024_02_g9ec"))			//this hardcoding needs to get in the bin.
 		)
 	{
-		Game::Print::PrintBottomCentre("~r~Warning~s~: 9th Gen content detected, Game may crash. Read Menyoolog for fix instructions.");
+		Game::Print::PrintBottomCentre("~r~哔哩哔哩：羽一大魔王");
 		ige::myLog << ige::LogType::LOG_WARNING << "Gen9 Content found in dlcpacks, this can cause instability when attempted to be loaded by Menyoo." << std::endl 
 			<< "			You can find these in your dlclist.xml by searching for \"g9\" and removing these lines or using a comment." << std::endl 
 			<< "				    		For example: <!--<Item>dlcpacks:/mpg9ec/</Item>-->" << std::endl << std::endl
