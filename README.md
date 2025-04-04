@@ -1,13 +1,13 @@
-[![GitHub Current Version)](https://img.shields.io/github/v/release/itsjustcurtis/MenyooSP?label=Release%20Version&logo=GitHub)](https://github.com/itsjustcurtis/MenyooSP/releases/latest/download/MenyooSP.zip)
-[![GitHub Latest nightly)](https://img.shields.io/github/v/release/itsjustcurtis/MenyooSP?include_prereleases&label=Pre-release%20Version&logo=GitHub)](https://github.com/itsjustcurtis/MenyooSP/releases/)
-[![GitHub latest release](https://img.shields.io/github/downloads/itsjustcurtis/MenyooSP/latest/total?label=Latest%20Downloads&logo=GitHub)](https://github.com/itsjustcurtis/MenyooSP/releases/latest)
-[![GitHub all releases](https://img.shields.io/github/downloads/itsjustcurtis/MenyooSP/total?label=Total%20Downloads&logo=GitHub)](https://github.com/itsjustcurtis/MenyooSP/releases)
+[![GitHub Current Version)](https://img.shields.io/github/v/release/lucienlmy/MenyooSP-ItsJustCurtis?label=Release%20Version&logo=GitHub)](https://github.com/lucienlmy/MenyooSP-ItsJustCurtis/releases/latest/download/MenyooSP.zip)
+[![GitHub Latest nightly)](https://img.shields.io/github/v/release/lucienlmy/MenyooSP-ItsJustCurtis?include_prereleases&label=Pre-release%20Version&logo=GitHub)](https://github.com/lucienlmy/MenyooSP-ItsJustCurtis/releases/)
+[![GitHub latest release](https://img.shields.io/github/downloads/lucienlmy/MenyooSP-ItsJustCurtis/latest/total?label=Latest%20Downloads&logo=GitHub&display=number)](https://github.com/lucienlmy/MenyooSP-ItsJustCurtis/releases/latest)
+[![GitHub all releases](https://img.shields.io/github/downloads/lucienlmy/MenyooSP-ItsJustCurtis/total?label=Total%20Downloads&logo=GitHub&display=number)](https://github.com/lucienlmy/MenyooSP-ItsJustCurtis/releases)
 
 ![image](https://github.com/itsjustcurtis/MenyooSP/assets/70447190/38f28c30-5585-4f77-b204-6a8c8149defe)
 
 
-# Menyoo PC - [DOWNLOAD LATEST RELEASE](https://github.com/itsjustcurtis/MenyooSP/releases/latest/download/MenyooSP.zip)
-# Menyoo PC - [DOWNLOAD LATEST NIGHTLY](https://github.com/itsjustcurtis/MenyooSP/releases/)
+# Menyoo PC - [DOWNLOAD LATEST RELEASE](https://github.com/lucienlmy/MenyooSP-ItsJustCurtis/releases/latest/download/MenyooSP.zip)
+# Menyoo PC - [DOWNLOAD LATEST NIGHTLY](https://github.com/lucienlmy/MenyooSP-ItsJustCurtis/releases/)
 ### a.k.a. MenyooSP
 #### Trainer for Grand Theft Auto V (Single-player and FiveM).
 ---
