@@ -2393,7 +2393,7 @@ inline void set_Handling_Mult69_7()
 		if (IS_DISABLED_CONTROL_PRESSED(2, INPUT_SCRIPT_PAD_RIGHT) || IsKeyDown('D'))
 			APPLY_FORCE_TO_ENTITY(g_myVeh, 1, mult69_7 / 220, 0.0, 0.0, 0.0, 0.0, 0.0, 0, 1, 1, 1, 0, 1);
 		if (IS_DISABLED_CONTROL_PRESSED(2, INPUT_SCRIPT_PAD_LEFT) || IsKeyDown('A'))
-		APPLY_FORCE_TO_ENTITY(g_myVeh, 1, (0 - mult69_7) / 220, 0.0, 0.0, 0.0, 0.0, 0.0, 0, 1, 1, 1, 0,1);
+			APPLY_FORCE_TO_ENTITY(g_myVeh, 1, (0 - mult69_7) / 220, 0.0, 0.0, 0.0, 0.0, 0.0, 0, 1, 1, 1, 0,1);
 	}
 	else
 	{
@@ -2852,7 +2852,7 @@ void set_vehicle_wheels_invisible(GTAvehicle vehicle, bool enable)
 // Ped - ability (multiplier lists)
 std::map<Ped, std::string> g_pedList_movGrp;
 std::map<Ped, std::string> g_pedList_wmovGrp;
-std::map<Ped, std::string> g_pedList_facial_mood; // 添加这一行
+std::map<Ped, std::string> g_pedList_facial_mood;
 
 // Spooner/ped - facial mood - getter/setter
 std::map<Ped, std::string> g_pedList_facialMood;
@@ -3498,7 +3498,7 @@ void Menu::loops()
 			set_vehicle_heavy_mass_tick(g_myVeh);
 
 
-			// ONLY IF PAUSE MENU IS INACTIVE
+		// ONLY IF PAUSE MENU IS INACTIVE
 		if (!gameIsPaused)
 		{
 			// Race boost (self)
