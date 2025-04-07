@@ -1,4 +1,4 @@
-/*
+﻿/*
 * Menyoo PC - Grand Theft Auto V single-player trainer mod
 * Copyright (C) 2019  MAFINS
 *
@@ -7,6 +7,8 @@
 * the Free Software Foundation, either version 3 of the License, or
 * (at your option) any later version.
 */
+#pragma execution_character_set("utf-8")
+
 #pragma once
 
 #include <string>
