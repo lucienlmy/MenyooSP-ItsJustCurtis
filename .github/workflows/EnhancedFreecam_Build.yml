@@ -1,0 +1,345 @@
+name: EnhancedFreecam_Build
+
+on:
+  push:
+    branches: [ "EnhancedFreecam-joy" ]
+
+env:
+  SOLUTION_FILE_PATH: ./Solution/Menyoo.sln
+  BUILD_CONFIGURATION: Release
+  CANCELJOB: false
+
+permissions:
+  contents: write
+  pull-requests: write
+  packages: write
+
+jobs:
+  check-version-and-merge:
+    runs-on: ubuntu-latest
+    outputs:
+      CANCELJOB: ${{ steps.set_output.outputs.CANCELJOB }}
+      VERSION: ${{ steps.calculate_version.outputs.VERSION }}
+    steps:
+      - name: Checkout repository
+        if: env.CANCELJOB != 'true'
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Calculate Version with Commit Count
+        id: calculate_version
+        if: env.CANCELJOB != 'true'
+        shell: bash
+        run: |
+          COMMIT_COUNT=$(git rev-list --count HEAD)
+          BASE_VERSION=$(grep '#define MENYOO_CURRENT_VER_' Solution/source/macros.h | awk '{print $3}' | tr -d '"')
+          VERSION="v${BASE_VERSION}.${COMMIT_COUNT}"
+          echo "VERSION=${VERSION}" >> $GITHUB_ENV
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "Generated base version: $VERSION"
+
+      - name: Check if tag already exists and increment version
+        if: env.CANCELJOB != 'true'
+        id: increment_version
+        shell: bash
+        run: |
+          BASE_VERSION=${{ env.VERSION }}
+          COUNTER=1
+          FINAL_VERSION=$BASE_VERSION
+
+          echo "Checking if version $BASE_VERSION exists..."
+          # Check using GitHub API first
+          while gh api repos/${{ github.repository }}/git/ref/tags/$FINAL_VERSION --silent >/dev/null 2>&1; do
+            echo "Version $FINAL_VERSION already exists, incrementing..."
+            FINAL_VERSION="${BASE_VERSION}.${COUNTER}"
+            COUNTER=$((COUNTER + 1))
+            echo "Trying new version: $FINAL_VERSION"
+          done
+
+          # Double-check with git ls-remote as fallback
+          if git ls-remote --tags origin "refs/tags/$FINAL_VERSION" | grep -q "$FINAL_VERSION"; then
+            echo "Fallback check found existing tag $FINAL_VERSION, incrementing further..."
+            FINAL_VERSION="${BASE_VERSION}.${COUNTER}"
+            COUNTER=$((COUNTER + 1))
+          fi
+
+          echo "Final version after increment checks: $FINAL_VERSION"
+          echo "VERSION=$FINAL_VERSION" >> $GITHUB_ENV
+          echo "version=$FINAL_VERSION" >> $GITHUB_OUTPUT
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check version pattern and merge
+        id: check_version 
+        if: env.CANCELJOB != 'true'
+        shell: bash
+        run: |
+          VERSION=${{ env.VERSION }}
+          echo "检查版本格式: $VERSION"
+          
+          if [[ $GITHUB_REF == "refs/heads/main" ]]; then
+            echo "主分支，跳过检查"
+            exit 0
+          fi
+
+          # 支持以下版本格式:
+          # v2.1.4         - 标准版本
+          # v2.1.4.123    - 带构建号的版本
+          # v2.1.4a1      - 预发布版本
+          # v2.1.4a1.123  - 带构建号的预发布版本
+          if [[ $VERSION =~ ^v[0-9]+\.[0-9]+\.[0-9]+((a|b|rc)[0-9]+)?(\.[0-9]+)?$ ]]; then
+            echo "版本格式有效: $VERSION"
+            
+            # 检查是否存在PR并尝试合并
+            PR_EXISTS=$(gh pr list --head EnhancedFreecam-joy --base main --state open --json number,title \
+              | jq -r --arg VERSION "$VERSION" '.[] | select(.title | contains($VERSION)) | .number')
+
+            if [ -z "$PR_EXISTS" ]; then
+              echo "创建新的PR..."
+              gh pr create \
+                --title "Release $VERSION" \
+                --body "从 EnhancedFreecam-joy 合并到 main 分支，发布版本 $VERSION" \
+                --base main \
+                --head EnhancedFreecam-joy || echo "PR创建失败，可能已存在"
+            else
+              echo "已存在PR #$PR_EXISTS，尝试合并"
+              # 尝试合并现有PR
+              gh pr merge $PR_EXISTS --auto --squash || echo "PR #$PR_EXISTS 目前无法合并，继续执行"
+            fi
+          else
+            echo "警告：版本格式不标准，但继续执行: $VERSION"
+          fi
+          # 总是返回成功
+          exit 0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set output
+        id: set_output
+        if: env.CANCELJOB != 'true'
+        run: |
+          echo "CANCELJOB=${{ env.CANCELJOB }}" >> $GITHUB_OUTPUT
+          echo "version=${{ env.VERSION }}" >> $GITHUB_OUTPUT
+
+      - name: Check version and merge PR
+        id: check_version2
+        if: env.CANCELJOB != 'true'
+        shell: bash
+        run: |
+          VERSION=${{ env.VERSION }}
+          echo "检查版本: $VERSION"
+          
+          # 确保已安装GitHub CLI
+          if ! command -v gh &> /dev/null; then
+            echo "正在安装GitHub CLI..."
+            curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+            echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+            sudo apt update
+            sudo apt install gh -y
+          fi
+
+          # 修复 jq 语法并检查是否已存在PR
+          PR_EXISTS=$(gh pr list --head EnhancedFreecam-joy --base main --state open --json number,title \
+            | jq -r --arg VERSION "$VERSION" '.[] | select(.title | contains($VERSION)) | .number')
+
+          if [ -z "$PR_EXISTS" ]; then
+            echo "创建新的PR..."
+            gh pr create \
+              --title "Release $VERSION" \
+              --body "从 EnhancedFreecam-joy 合并到 main 分支，发布版本 $VERSION" \
+              --base main \
+              --head EnhancedFreecam-joy || true
+            
+            echo "PR已创建或已存在"
+          else
+            echo "已存在PR #$PR_EXISTS，尝试合并"
+            # 尝试自动合并PR，如果失败则继续执行
+            gh pr merge $PR_EXISTS --auto --squash || {
+              echo "警告: PR #$PR_EXISTS 无法自动合并,可能存在冲突,继续执行工作流"
+              true
+            }
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build:
+    if: github.ref == 'refs/heads/EnhancedFreecam-joy' && needs.check-version-and-merge.outputs.CANCELJOB != 'true'
+    runs-on: windows-latest
+    needs: check-version-and-merge
+    env:
+      VERSION: ${{ needs.check-version-and-merge.outputs.VERSION }}
+    outputs:
+      VERSION: ${{ needs.check-version-and-merge.outputs.VERSION }}
+    steps:
+      - name: Verify Version
+        run: |
+          if ([string]::IsNullOrEmpty("${{ env.VERSION }}")) {
+            Write-Error "Version is empty or not set"
+            exit 1
+          }
+          echo "Building version: ${{ env.VERSION }}"
+
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v1.1
+
+      - name: Build solution
+        working-directory: ${{ env.GITHUB_WORKSPACE }}
+        run: |
+          msbuild /m /p:Configuration=${{ env.BUILD_CONFIGURATION }} ${{ env.SOLUTION_FILE_PATH }} -verbosity:minimal -p:WarningLevel=0
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: MenyooSP-${{ env.VERSION }}
+          path: |
+            Solution/source/_Build/bin/Release/
+            !Solution/source/_Build/bin/Release/Trash/
+            !Solution/source/_Build/bin/Release/*.map
+            !Solution/source/_Build/bin/Release/*.pdb
+
+      - name: Cancel workflow on failure
+        if: failure()
+        uses: andymckay/cancel-action@0.2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  release:
+    needs: [check-version-and-merge, build]
+    permissions:
+      contents: write
+      packages: write
+    runs-on: windows-latest
+    env:
+      VERSION: ${{ needs.check-version-and-merge.outputs.VERSION }}
+    steps:
+      - name: Debug Version
+        run: |
+          echo "VERSION: ${{ env.VERSION }}"
+          echo "check-version-and-merge VERSION: ${{ needs.check-version-and-merge.outputs.VERSION }}"
+
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: MenyooSP-${{ env.VERSION }}
+          path: artifacts
+
+      - name: Verify downloaded artifacts
+        run: |
+          echo "Verifying downloaded artifacts in the 'artifacts' folder:"
+          ls artifacts -Recurse
+
+      - name: Create release zip
+        shell: pwsh
+        run: |
+          # Use the downloaded artifacts directory as the source for ZIP
+          $sourceDir = "artifacts"
+          $zipFile = "MenyooSP-${{ env.VERSION }}.zip"
+          
+          Write-Host "Listing contents of artifacts folder:"
+          Get-ChildItem $sourceDir -Recurse
+
+          if (-Not (Test-Path $sourceDir)) {
+            Write-Error "Source directory does not exist: $sourceDir"
+            exit 1
+          }
+
+          if (Test-Path $zipFile) {
+            Remove-Item $zipFile -Force
+          }
+          
+          # Use Compress-Archive to create the zip file from the artifacts folder
+          Compress-Archive -Path "$sourceDir\*" -DestinationPath $zipFile
+
+          if (-Not (Test-Path $zipFile)) {
+            Write-Error "Failed to create zip file: $zipFile"
+            exit 1
+          }
+
+          Write-Host "Created zip file: $zipFile"
+          Get-Item $zipFile
+
+      - name: Get commit messages
+        id: get_commits
+        shell: pwsh
+        run: |
+          # 确保完整克隆
+          git fetch --prune --unshallow
+          
+          # 获取本次推送的提交范围
+          $beforeSha = "${{ github.event.before }}"
+          $afterSha = "${{ github.event.after }}"
+          
+          Write-Host "获取从 $beforeSha 到 $afterSha 的提交"
+          
+          # 获取本次推送的所有提交
+          $commits = git rev-list --reverse "$beforeSha..$afterSha"
+          $formattedCommits = @()
+          
+          foreach ($commit in $commits) {
+              # 获取单个提交的详细信息
+              $hash = git rev-parse --short=7 $commit
+              $message = git log -1 --format="%s" $commit
+              $author = git log -1 --format="%an" $commit
+              
+              # 格式化提交信息
+              $formattedCommits += "- ${hash}: ${message} (${author})"
+          }
+          
+          if ($formattedCommits.Count -eq 0) {
+              Write-Host "未找到提交，使用最新提交"
+              $hash = git rev-parse --short=7 HEAD
+              $message = git log -1 --format="%s" HEAD
+              $author = git log -1 --format="%an" HEAD
+              $formattedCommits += "- ${hash}: ${message} (${author})"
+          }
+          
+          # 将提交信息写入输出
+          $commitMessage = $formattedCommits -join "`n"
+          echo "commit_message<<EOF" >> $env:GITHUB_OUTPUT
+          echo "$commitMessage" >> $env:GITHUB_OUTPUT
+          echo "EOF" >> $env:GITHUB_OUTPUT
+          
+          Write-Host "本次推送的提交:"
+          Write-Host $commitMessage
+
+      - name: Create GitHub release
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ env.VERSION }}
+          name: "MenyooSP ${{ env.VERSION }}"
+          body: |
+            # 版本发布说明:
+
+            ## 更新内容
+            ${{ steps.get_commits.outputs.commit_message }}
+            
+            ## 提交详情
+            ${{ github.event.head_commit.message }}
+            
+            ## 其他信息
+            - 发布时间: ${{ format(github.event.head_commit.timestamp, 'yyyy-MM-dd HH:mm:ss') }}
+            - 分支: ${{ github.ref_name }}
+            - 构建: [Workflow Run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+            
+            完整更新日志: https://github.com/${{ github.repository }}/commits/${{ github.sha }}
+          prerelease: ${{ contains(env.VERSION, 'a') || contains(env.VERSION, 'b') || contains(env.VERSION, 'rc') }}
+          files: MenyooSP-${{ env.VERSION }}.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify release
+        if: always()
+        run: |
+          echo "Release created with tag: ${{ env.VERSION }}"
+          echo "Release URL: ${{ steps.create_release.outputs.html_url }}"

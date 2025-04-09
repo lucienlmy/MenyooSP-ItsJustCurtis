@@ -1550,6 +1550,49 @@ void set_no_clip_off2()
 		World::RenderingCamera_set(0);
 	}
 }
+
+// 添加一个工具函数来强制获取地面高度坐标
+float GetGroundZFor3DCoord(float x, float y, float z) {
+    float groundZ = 0.0f;
+    float probeHeight[] = { 0, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000 };
+    
+    // 第一次尝试获取地面高度
+    if (GET_GROUND_Z_FOR_3D_COORD(x, y, z, &groundZ, 0, 0)) {
+        return groundZ;
+    }
+
+    // 第一轮检查 - 从下到上请求碰撞
+    for (int i = 0; i < sizeof(probeHeight)/sizeof(float); i++) {
+        REQUEST_COLLISION_AT_COORD(x, y, probeHeight[i]);
+        WAIT(0);
+        if (GET_GROUND_Z_FOR_3D_COORD(x, y, z, &groundZ, 0, 0)) {
+            return groundZ; 
+        }
+    }
+
+    // 第二轮检查 - 反向
+    float probeHeight2[] = { 1000, 900, 800, 700, 600, 500, 400, 300, 200, 100, 0, -100, -200, -300, -400, -500 };
+    for (int i = 0; i < sizeof(probeHeight2)/sizeof(float); i++) {
+        REQUEST_COLLISION_AT_COORD(x, y, probeHeight2[i]);
+        WAIT(0);
+        if (GET_GROUND_Z_FOR_3D_COORD(x, y, z, &groundZ, 0, 0)) {
+            return groundZ;
+        }
+    }
+
+    // 第三轮检查 - 上下来回
+    float probeHeight3[] = { -500, -400, -300, -200, -100, 0, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000 };
+    for (int i = 0; i < sizeof(probeHeight3)/sizeof(float); i++) {
+        REQUEST_COLLISION_AT_COORD(x, y, probeHeight3[i]);
+        WAIT(0);
+        if (GET_GROUND_Z_FOR_3D_COORD(x, y, z, &groundZ, 0, 0)) {
+            return groundZ;
+        }
+    }
+
+    return 0.0f;
+}
+
 void set_no_clip()
 {
 	if (sub::Spooner::SpoonerMode::bEnabled)
@@ -1675,6 +1718,7 @@ void set_no_clip()
 					}
 					g_lastHeightLockMessageTime = GetTickCount();
 				}
+				
 				// 处理鼠标滚轮来调整速度
 				if(IS_DISABLED_CONTROL_PRESSED(2, INPUT_CURSOR_SCROLL_UP))
 				{
@@ -1764,7 +1808,7 @@ void set_no_clip()
 						// 保存当前FOV为默认值
 						MenuConfig::FreeCam::defaultFov = currentFov;
 						MenuConfig::ConfigSave();
-            
+						
 						// 显示当前FOV值
 						Game::Print::setupdraw(GTAfont::Impact, Vector2(0.4f, 0.4f), true, false, false);
 						Game::Print::drawstring(oss_ << "Camera FOV: " << currentFov, 0.5f, 0.95f);
@@ -1811,6 +1855,38 @@ void set_no_clip()
 			//	Menu::add_IB(INPUT_SPRINT, "Hasten");
 			//	//Menu::add_IB(-3, "Visibility - T");
 			//}
+		}
+	}
+
+	// 按空格键时自动落地
+	if (IsKeyJustUp(VK_SPACE)) {
+		const Vector3& currentPos = ent.Position_get();
+		
+		// 获取正下方地面高度
+		float groundZ = GetGroundZFor3DCoord(currentPos.x, currentPos.y, 1000.0f);
+		if (groundZ != 0.0f) {
+			// 计算新位置
+			Vector3 newPos = { currentPos.x, currentPos.y, groundZ + 1.0f };
+			
+			// 平滑过渡到新位置
+			float transitionSpeed = 0.1f;
+			Vector3 currentPosLerp = currentPos;
+			
+			while (currentPosLerp.DistanceTo(newPos) > 0.1f) {
+				// 线性插值移动
+				currentPosLerp = currentPosLerp + (newPos - currentPosLerp) * transitionSpeed;
+				ent.Position_set(currentPosLerp);
+				WAIT(0);
+			}
+			
+			// 最后设置精确位置
+			ent.Position_set(newPos);
+			
+			// 播放落地音效
+			PLAY_SOUND_FRONTEND(-1, "Hit_In", "PLAYER_SWITCH_CUSTOM_SOUNDSET", 1);
+			
+			// 显示提示信息
+			Game::Print::PrintBottomCentre("~g~Already on the ground");
 		}
 	}
 
@@ -2393,7 +2469,7 @@ inline void set_Handling_Mult69_7()
 		if (IS_DISABLED_CONTROL_PRESSED(2, INPUT_SCRIPT_PAD_RIGHT) || IsKeyDown('D'))
 			APPLY_FORCE_TO_ENTITY(g_myVeh, 1, mult69_7 / 220, 0.0, 0.0, 0.0, 0.0, 0.0, 0, 1, 1, 1, 0, 1);
 		if (IS_DISABLED_CONTROL_PRESSED(2, INPUT_SCRIPT_PAD_LEFT) || IsKeyDown('A'))
-			APPLY_FORCE_TO_ENTITY(g_myVeh, 1, (0 - mult69_7) / 220, 0.0, 0.0, 0.0, 0.0, 0.0, 0, 1, 1, 1, 0,1);
+		APPLY_FORCE_TO_ENTITY(g_myVeh, 1, (0 - mult69_7) / 220, 0.0, 0.0, 0.0, 0.0, 0.0, 0, 1, 1, 1, 0,1);
 	}
 	else
 	{
