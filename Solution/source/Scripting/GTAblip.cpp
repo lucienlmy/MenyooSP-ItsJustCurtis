@@ -27,6 +27,7 @@
 
 #include <string>
 #include <map>
+#include <algorithm>
 
 namespace BlipIcon {
 	const std::map<int, std::string> vNames
@@ -78,6 +79,7 @@ namespace BlipIcon {
 		{ BlipIcon::HeistStore, "HeistStore" },
 		{ BlipIcon::PoliceStation, "PoliceStation" },
 		{ BlipIcon::Hospital, "Hospital" },
+		{ BlipIcon::Elevator,"Elevator"},
 		{ BlipIcon::Helicopter, "Helicopter" },
 		{ BlipIcon::StrangersAndFreaks, "StrangersAndFreaks" },
 		{ BlipIcon::ArmoredTruck, "ArmoredTruck" },
@@ -591,6 +593,8 @@ namespace BlipIcon {
 		{ BlipIcon::SubPeriscope, "Sub Periscope" },
 		{ BlipIcon::SubMissiles, "Sub Missiles" },
 		{ BlipIcon::Painting, "Painting" },
+		{ BlipIcon::LSCarMeet, "LS Car Meet"},
+		{ BlipIcon::CarTest, "Steering Wheel"},
 		{ BlipIcon::AutoShop, "Auto Shop" },
 		{ BlipIcon::Anchor, "Anchor" },
 		{ BlipIcon::PrizeBox, "Prize Box" },
@@ -872,7 +876,23 @@ void GTAblip::SetPriority(int priority)
 {
     SET_BLIP_PRIORITY(this->mHandle, priority);
 }
+// New Blip functions
 
+void GTAblip::SetPriority(int priority)
+{
+	mPriority = priority;
+	HUD::SET_BLIP_PRIORITY(mHandle, mPriority);
+}
+
+int GTAblip::GetPriority() const
+{
+	return mPriority;
+}
+void GTAblip::SetDisplayMode(int value)
+{
+	SET_BLIP_DISPLAY(this->mHandle, value);
+}
+// New Blip functions end here.
 void GTAblip::SetRotationWithFloat(float heading)
 {
     SET_BLIP_ROTATION_WITH_FLOAT(this->mHandle, heading);

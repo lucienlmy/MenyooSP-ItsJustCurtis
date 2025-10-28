@@ -149,6 +149,8 @@ namespace sub::Spooner
 			this->showRoute = otherTskT->showRoute;
 			this->showNumber = otherTskT->showNumber;
 			this->isSelectableOnMap = otherTskT->isSelectableOnMap;
+			// New functions
+
 		}
 		AddBlip::AddBlip()
 		{
@@ -169,6 +171,9 @@ namespace sub::Spooner
 			this->showRoute = false;
 			this->showNumber = 0;
 			this->isSelectableOnMap = true;
+			// New functions
+			this->priority = 2;
+			this->displayMode = 2;
 		}
 		void AddBlip::Run(void* ve)
 		{
@@ -200,6 +205,12 @@ namespace sub::Spooner
             			this->blip.SyncRotationWithEntity(e.Handle.GetHandle());
         			}
     			}
+				// New Functions
+				this->blip.SetDisplayMode(this->displayMode);
+
+			}
+
+
 		}
 
 		RemoveBlip::RemoveBlip()
