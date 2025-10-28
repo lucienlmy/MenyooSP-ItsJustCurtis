@@ -179,19 +179,11 @@ namespace sub::Spooner
     				if (priority_plus) { if (tskPtr->priority < INT_MAX) tskPtr->priority++; }
     				if (priority_minus) { if (tskPtr->priority > 0) tskPtr->priority--; }
 
-    AddToggle("Sync Rotation With Entity", tskPtr->syncRotation);
-
-				// New functions
-				bool priority_plus = false, priority_minus = false;
-				bool dummy = false;
+				AddToggle("Sync Rotation With Entity", tskPtr->syncRotation);
 
 				bool nonSelectable = (tskPtr->displayMode == 8);
 				AddToggle("Non-Selectable", nonSelectable);
 				tskPtr->displayMode = nonSelectable ? 8 : 2;
-
-				AddNumber("Priority", tskPtr->priority, 0, dummy, priority_plus, priority_minus);
-				if (priority_plus && tskPtr->priority < 10) tskPtr->priority++;
-				if (priority_minus && tskPtr->priority > 0) tskPtr->priority--;
 			}
 			void RemoveBlip()
 			{

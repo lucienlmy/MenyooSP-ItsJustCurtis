@@ -916,7 +916,6 @@ public:
 
 //New functions
 
-	void SetPriority(int priority);
 	int GetPriority() const;
 	void SetDisplayMode(int value);
 

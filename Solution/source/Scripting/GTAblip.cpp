@@ -878,12 +878,6 @@ void GTAblip::SetPriority(int priority)
 }
 // New Blip functions
 
-void GTAblip::SetPriority(int priority)
-{
-	mPriority = priority;
-	HUD::SET_BLIP_PRIORITY(mHandle, mPriority);
-}
-
 int GTAblip::GetPriority() const
 {
 	return mPriority;

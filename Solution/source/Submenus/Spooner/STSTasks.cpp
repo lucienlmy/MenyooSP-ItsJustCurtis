@@ -208,9 +208,6 @@ namespace sub::Spooner
 				// New Functions
 				this->blip.SetDisplayMode(this->displayMode);
 
-			}
-
-
 		}
 
 		RemoveBlip::RemoveBlip()

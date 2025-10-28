@@ -79,14 +79,13 @@ namespace sub::Spooner
 			bool showRoute;
 			int showNumber;
 			// New functions
-    			bool showCone = false;            
-    			int hudColorIndex;      
+    		bool showCone = false;            
+    		int hudColorIndex;      
 			bool isSelectableOnMap = true; // true = 2, false = 8
-    			int priority = 2;               
-    			int displayId;   
-    			bool syncRotation;  
+    		int priority = 2;               
+    		int displayId;   
+    		bool syncRotation;  
 			// New functions
-			int priority = 2;
 			int displayMode = 2;
 			// New functions end here
 			AddBlip();
