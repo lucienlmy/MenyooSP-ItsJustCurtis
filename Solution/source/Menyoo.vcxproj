@@ -12,7 +12,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\external\pugixml\src\pugixml.cpp" />
-    <ClCompile Include="BodyguardSettings.cpp" />
     <ClCompile Include="Memory\Hooking.cpp" />
     <ClCompile Include="Menu\FolderPreviewBmps.cpp" />
     <ClCompile Include="Menu\Language.cpp" />
@@ -38,6 +37,7 @@
     <ClCompile Include="Scripting\DxHookIMG.cpp" />
     <ClCompile Include="Scripting\enums.cpp" />
     <ClCompile Include="Submenus\AnimalRiding.cpp" />
+    <ClCompile Include="Submenus\BodyguardSettings.cpp" />
     <ClCompile Include="Submenus\BreatheStuff.cpp" />
     <ClCompile Include="Submenus\CutscenePlayer.cpp" />
     <ClCompile Include="Submenus\FunnyVehicles.cpp" />
@@ -124,7 +124,6 @@
   <ItemGroup>
     <ClInclude Include="..\external\pugixml\src\pugiconfig.hpp" />
     <ClInclude Include="..\external\pugixml\src\pugixml.hpp" />
-    <ClInclude Include="BodyguardSettings.h" />
     <ClInclude Include="Memory\Hooking.h" />
     <ClInclude Include="Menu\FolderPreviewBmps.h" />
     <ClInclude Include="Menu\Language.h" />
@@ -151,6 +150,7 @@
     <ClInclude Include="Scripting\DxHookIMG.h" />
     <ClInclude Include="Scripting\enums.h" />
     <ClInclude Include="Submenus\AnimalRiding.h" />
+    <ClInclude Include="Submenus\BodyguardSettings.h" />
     <ClInclude Include="Submenus\BreatheStuff.h" />
     <ClInclude Include="Submenus\CutscenePlayer.h" />
     <ClInclude Include="Submenus\FunnyVehicles.h" />

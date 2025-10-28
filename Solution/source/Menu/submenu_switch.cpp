@@ -54,7 +54,7 @@
 
 #include "..\Submenus\Spooner\Submenus.h"
 #include "..\Submenus\Spooner\Submenus_TaskSequence.h"
-#include "../BodyguardSettings.h"
+#include "..\Submenus\BodyguardSettings.h"
 
 
 void Menu::submenu_switch()
