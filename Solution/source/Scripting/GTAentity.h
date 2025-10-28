@@ -166,6 +166,7 @@ public:
 	void HasCollisionWithEntity_set(const GTAentity& ent, bool value);
 	bool IsCollisionEnabled_get() const;
 	void IsCollisionEnabled_set(bool value);
+	void ToggleLandingGear();
 
 	virtual int NetID() const;
 

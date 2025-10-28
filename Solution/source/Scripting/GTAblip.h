@@ -899,7 +899,6 @@ public:
 
 	void ShowCone (bool toggle, int hudColorIndex, float coneWidth = 1.0f, int coneColour = BlipColour::Blue);
 
-	bool IsSelectableOnMap() const;
 	void SetSelectableOnMap(bool selectable);
 
 	void SetPriority(int priority);
