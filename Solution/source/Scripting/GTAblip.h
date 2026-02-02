@@ -764,7 +764,7 @@ namespace BlipIcon {
 		Cat = 954,
 		Mansion1 = 955,
 		Mansion2 = 956,
-		Mansion3 = 957
+		Mansion3 = 957,
 	};
 
 	extern const std::map<int, std::string> vNames;
