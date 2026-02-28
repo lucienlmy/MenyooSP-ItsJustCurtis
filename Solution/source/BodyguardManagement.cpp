@@ -4,11 +4,13 @@
 #include "Scripting/Game.h"
 #include "Scripting/GTAped.h"
 #include "Scripting/GTAentity.h"
+#include "Scripting/GTAblip.h"
 #include "Natives/natives.h"
 
 #include <algorithm>
 #include "Util/StringManip.h"
 #include "Scripting/Model.h"
+#include "Scripting/World.h"
 
 namespace sub::BodyguardMenu
 {
@@ -74,46 +76,57 @@ namespace sub::BodyguardMenu
 
 		void RemoveBodyguardFromDb(const BodyguardEntity& ent)
 		{
-			const auto it = std::find(BodyguardDb.begin(), BodyguardDb.end(), ent);
+			auto it = std::remove_if(
+				BodyguardDb.begin(),
+				BodyguardDb.end(),
+				[&](const BodyguardEntity& e)
+				{
+					return e.Handle.GetHandle() == ent.Handle.GetHandle();
+				}
+			);
+
 			if (it != BodyguardDb.end())
-				BodyguardDb.erase(it);
+				BodyguardDb.erase(it, BodyguardDb.end());
 		}
 
 		void DeleteBodyguard(BodyguardEntity& ent)
 		{
 			if (!ent.Handle.Exists())
-			{
-				RemoveBodyguardFromDb(ent);
 				return;
-			}
 
-			RemoveBodyguardFromDb(ent);
+			Ped ped = ent.Handle.GetHandle();
+
+			ent.Handle.RequestControl();
+
+			GTAblip blip = ent.Handle.CurrentBlip();
+			if (blip.Exists())
+				blip.Remove();
+
 			ent.Handle.Detach();
 
-			GTAentity playerPed = PLAYER::PLAYER_PED_ID();
-			if (ent.Handle != playerPed)
-				ent.Handle.Delete(true);
+			ent.Handle.MissionEntity_set(false);
+
+			if (ped && ENTITY::DOES_ENTITY_EXIST(ped))
+			{
+				PED::DELETE_PED(&ped);
+			}
+
+			ent.Handle = GTAped();
+
+			RemoveBodyguardFromDb(ent);
 		}
 				
-
-			void ShowArrowAboveEntity(const GTAentity & entity)
+		void ShowArrowAboveEntity(const GTAentity& ent, RGBA colour)
+		{
+			if (ent.Exists())
 			{
-				if (!entity.Exists())
-					return;
-
-				Vector3 pos = entity.GetOffsetInWorldCoords({ 0.0f, 0.0f, 1.5f });
-				GRAPHICS::DRAW_MARKER(
-					2,              // type
-					pos.x, pos.y, pos.z,
-					0, 0, 0,        // direction
-					0, 0, 0,        // rotation
-					0.3f, 0.3f, 0.3f, // scale
-					255, 0, 0, 200, // color
-					false, false, 2,
-					false, nullptr, nullptr, false
-				);
+				const auto& soe_pos = ent.Position_get();
+				const auto& soe_md = ent.ModelDimensions();
+				const auto& markerPos = soe_pos + Vector3(0, 0, (std::max)(soe_md.Dim1.z, soe_md.Dim2.z) + 0.20f); // May not be at the right position if the entity is tilted
+				World::DrawMarker(MarkerType::UpsideDownCone, markerPos, Vector3(), Vector3(), Vector3(0.45f, 0.45f, 0.50f), RGBA(190, 0, 0, 190));
 			}
 
 		
+		}
 	}
 }

@@ -1,7 +1,7 @@
 #pragma once
 namespace sub::BodyguardMenu
 {
-void BodyguardEntityOps();
-void BodyguardWeaponOps();
-void BodyguardWardrobe();
+	void BodyguardEntityOps();
+	void BodyguardWeaponOps();
+	void BodyguardWeaponLoadoutOps();
 }

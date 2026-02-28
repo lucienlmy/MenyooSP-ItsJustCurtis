@@ -23,6 +23,7 @@
 #include "Submenus/PedModelChanger.h"
 #include "Util/StringManip.h"
 #include "Submenus/Spooner/EntityManagement.h"
+#include "BodyguardMenu.h"
 
 namespace sub::BodyguardMenu
 {
@@ -92,7 +93,7 @@ namespace sub::BodyguardMenu::BodyguardManagement
 
 		if (!bPressed) return;
 
-		if (s_bodyguards.size() >= MAX_BODYGUARDS)
+		if (sub::BodyguardMenu::BodyguardDb.size() >= MAX_BODYGUARDS)
 		{
 			Game::Print::PrintBottomLeft("Maximum of 7 bodyguards reached.");
 			return;
@@ -143,6 +144,11 @@ namespace sub::BodyguardMenu::BodyguardManagement
 		ent.HashName = int_to_hexstring(model.hash, true);
 
 		sub::BodyguardMenu::BodyguardManagement::AddBodyguardToDb(ent);
+		for (auto& bg : sub::BodyguardMenu::BodyguardDb)
+		{
+			if (bg.Handle.Exists())
+				ApplyBodyguardBlip(bg.Handle.GetHandle(), sub::BodyguardMenu::blipIcon);
+		}
 
 		s_bodyguards.push_back(ped);
 
