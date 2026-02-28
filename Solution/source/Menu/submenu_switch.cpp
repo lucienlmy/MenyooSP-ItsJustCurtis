@@ -223,7 +223,6 @@ void Menu::submenu_switch()
 	case SUB::CLOUDOPS:					sub::WeatherClouds_catind::sub_CloudOps(); break;
 	case SUB::WATERHACK:				sub::WaterHack_catind::Sub_WaterHack(); break;
 	case SUB::TIMEOPS:					sub::TimeOps_(); break;
-	case SUB::BODYGUARDOPS:				sub::BodyguardOps_(); break;
 	case SUB::MISCOPS:					sub::MiscOps(); break;
 	case SUB::MAPMODS:					sub::MapMods_catind::MapMods_(); break;
 	case SUB::MAPMODS2:					sub::MapMods_catind::MapMods2_(); break;
@@ -266,7 +265,6 @@ void Menu::submenu_switch()
 	case SUB::SPOONER_MANAGEMARKERS_INMARKER_ATTACH:			sub::Spooner::Submenus::Sub_ManageMarkers_InMarker_Attach(); break;
 	case SUB::SPOONER_MANAGEDB:						sub::Spooner::Submenus::Sub_ManageEntities(); break;
 	case SUB::SPOONER_MANAGEDB_REMOVAL:				sub::Spooner::Submenus::Sub_ManageEntities_Removal(); break;
-		//case SUB::SPOONER_MANAGEDB_REMOVAL_FROMDB:		sub::Spooner::Submenus::Sub_ManageEntities_Removal_FromDb(); break;
 	case SUB::SPOONER_SAVEFILES:					sub::Spooner::Submenus::Sub_SaveFiles(); break;
 	case SUB::SPOONER_SAVEFILES_LOAD:				sub::Spooner::Submenus::Sub_SaveFiles_Load(); break;
 	case SUB::SPOONER_SAVEFILES_LOAD_LEGACYSP00N:	sub::Spooner::Submenus::Sub_SaveFiles_Load_LegacySP00N(); break;

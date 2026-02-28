@@ -1727,12 +1727,11 @@ void GTAmemory::InitEnhancedPools() {
 		}
 		address = address - 0x2C;
 		addlog(ige::LogType::LOG_TRACE, "Found Pattern: " + std::to_string(address), __FILENAME__);
-	
-	GetModelInfo = (GetModelInfo_t)(address);
-	
-	_SpSnow = SpSnow();
-}
+
+		GetModelInfo = (GetModelInfo_t)(address);
+
 		_SpSnow = SpSnow();
+
 	}
 }
 

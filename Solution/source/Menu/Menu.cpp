@@ -528,7 +528,7 @@ void Menu::while_closed()
 	{
 
 		addlog(ige::LogType::LOG_TRACE, "Binds Pressed, opening Menyoo", __FILENAME__);
-		if (g_menuNotOpenedYet)
+		if (g_menuNotOpenedYet) {
 			justopened();
 			GTAmemory::InitEnhancedPools();
 		}
@@ -552,6 +552,7 @@ void Menu::while_closed()
 		currentop = 1;*/
 	}
 }
+
 void Menu::while_opened()
 {
 	totalop = printingop; printingop = 0;

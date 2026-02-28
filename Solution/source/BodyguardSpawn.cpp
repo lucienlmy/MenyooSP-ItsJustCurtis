@@ -3,7 +3,7 @@
 #include "Natives/natives.h"
 
 #include "BodyguardSpawn.h"
-#include "BodyguardFunction.h"
+//#include "BodyguardFunction.h"
 #include "BodyguardManagement.h"
 
 #include "Menu/Menu.h"
