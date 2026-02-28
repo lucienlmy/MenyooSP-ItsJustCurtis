@@ -756,7 +756,7 @@ namespace BlipIcon {
 		FireTruck = 943,
 		Forklift = 944,
 		Newspaper = 945,
-		//420Survival = 946, //420 breaks the code. Needs an alternative name.
+		NarcoSurvival = 946, //420 breaks the code. Needs an alternative name.
 		CommunityMission = 947,
 		PropertyMansion = 948,
 		Keypad2 = 949,
