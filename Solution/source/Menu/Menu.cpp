@@ -552,6 +552,7 @@ void Menu::while_closed()
 		currentop = 1;*/
 	}
 }
+
 void Menu::while_opened()
 {
 	totalop = printingop; printingop = 0;
