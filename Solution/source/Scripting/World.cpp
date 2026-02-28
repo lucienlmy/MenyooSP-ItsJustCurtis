@@ -646,12 +646,14 @@ namespace World
 	{
 		PCHAR dict = 0;
 		PCHAR name = 0;
+		float zOffset = 0.0f;
+		if (type == 1 || type == 43) zOffset = -0.7f;
 		if (textureDict.length() > 0 && textureName.length() > 0)
 		{
 			dict = (PCHAR)textureDict.c_str();
 			name = (PCHAR)textureName.c_str();
 		}
-		DRAW_MARKER(type, pos.x, pos.y, pos.z, dir.x, dir.y, dir.z, rot.x, rot.y, rot.z, scale.x, scale.y, scale.z, colour.R, colour.G, colour.B, colour.A, bobUpAndDown, faceCamY, unk2, rotateY, dict, name, drawOnEnt);
+		DRAW_MARKER(type, pos.x, pos.y, pos.z + zOffset, dir.x, dir.y, dir.z, rot.x, rot.y, rot.z, scale.x, scale.y, scale.z, colour.R, colour.G, colour.B, colour.A, bobUpAndDown, faceCamY, unk2, rotateY, dict, name, drawOnEnt);
 	}
 
 	void DrawLine(const Vector3& startPos, const Vector3& endPos, const RGBA& colour)

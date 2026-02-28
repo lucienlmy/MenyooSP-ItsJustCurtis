@@ -51,6 +51,10 @@
 #include <pugixml\src\pugixml.hpp>
 #include <dirent\include\dirent.h>
 
+int g_WeaponOpsPedOverride = 0;
+int g_WeaponOpsPlayerOverride = -1;
+Ped g_WeaponMenuPedOverride = 0;
+
 namespace sub
 {
 	void Weaponops()
@@ -58,8 +62,17 @@ namespace sub
 		dict2.clear();
 		dict3.clear();
 
-		Static_241 = PLAYER_PED_ID();
-		Static_240 = PLAYER_ID();
+		if (g_WeaponOpsPedOverride != 0)
+		{
+			Static_241 = g_WeaponOpsPedOverride;
+			Static_240 = g_WeaponOpsPlayerOverride;
+		}
+		else
+		{
+			Static_241 = PLAYER_PED_ID();
+			Static_240 = PLAYER_ID();
+		}
+
 
 		std::stringstream wdmg_ss;
 		wdmg_ss << std::fixed << std::setprecision(2) << (loop_weapon_damage_increase / 0.72f);
@@ -195,7 +208,7 @@ namespace sub
 			if (inputStr.length() > 0)
 			{
 				try { _globalForgeGun_shootForce = stof(inputStr); }
-				catch (...) { Game::Print::PrintError_InvalidInput(); }
+				catch (...) { Game::Print::PrintError_InvalidInput(inputStr); }
 			}
 			//OnscreenKeyboard::State::Set(OnscreenKeyboard::Purpose::SetArg1Float, std::string(), 10U, std::to_string(_globalForgeGun_shootForce));
 			//OnscreenKeyboard::State::arg1._ptr = reinterpret_cast<void*>(&_globalForgeGun_shootForce);
@@ -435,7 +448,7 @@ namespace sub
 				if (inputStr.length() > 0)
 				{
 					try { shootForce = stof(inputStr); }
-					catch (...) { Game::Print::PrintError_InvalidInput(); }
+					catch (...) { Game::Print::PrintError_InvalidInput(inputStr); }
 				}
 				//OnscreenKeyboard::State::Set(OnscreenKeyboard::Purpose::SetArg1Float, std::string(), 10U, std::to_string(shootForce));
 				//OnscreenKeyboard::State::arg1._ptr = reinterpret_cast<void*>(&shootForce);
@@ -524,7 +537,7 @@ namespace sub
 					kaboom_gun_hash = model.hash;
 					model.Load();
 				}
-				else Game::Print::PrintError_InvalidModel();
+				else Game::Print::PrintError_InvalidModel(inputStr);
 			}
 			//OnscreenKeyboard::State::Set(OnscreenKeyboard::Purpose::KaboomGunHash, std::string(), 64U, "Enter vehicle model name:");
 		}
@@ -639,7 +652,7 @@ namespace sub
 					ped_gun_hash = model;
 					model.Load();
 				}
-				else Game::Print::PrintError_InvalidModel();
+				else Game::Print::PrintError_InvalidModel(inputStr);
 			}
 			//OnscreenKeyboard::State::Set(OnscreenKeyboard::Purpose::PedGunHash, std::string(), 64U, "Enter ped model name:");
 		}
@@ -735,7 +748,7 @@ namespace sub
 					object_gun_hash = model;
 					model.Load();
 				}
-				else Game::Print::PrintError_InvalidModel();
+				else Game::Print::PrintError_InvalidModel(inputStr);
 			}
 			//OnscreenKeyboard::State::Set(OnscreenKeyboard::Purpose::ObjectGunHash, std::string(), 64U, "Enter object/vehicle model name:");
 		}
@@ -925,13 +938,13 @@ namespace sub
 								Game::Print::PrintBottomLeft("~r~Error:~s~ Unable to add weapon.");
 						}
 						else
-							Game::Print::PrintError_InvalidInput();
+							Game::Print::PrintError_InvalidInput(customNameStr);
 					}
 					else
-						Game::Print::PrintError_InvalidInput();
+						Game::Print::PrintError_InvalidInput(std::to_string(hashNameHash));
 				}
 				else
-					Game::Print::PrintError_InvalidInput();
+					Game::Print::PrintError_InvalidInput(hashNameStr);
 				//OnscreenKeyboard::State::Set(OnscreenKeyboard::Purpose::FavouriteWeaponEntryName, std::string(), 40U, "Enter name (e.g. WEAPON_FLAMETHROWER):");
 			}
 
@@ -953,7 +966,7 @@ namespace sub
 							Game::Print::PrintBottomLeft("~r~Error:~s~ Unable to add weapon.");
 					}
 					else
-						Game::Print::PrintError_InvalidInput();
+						Game::Print::PrintError_InvalidInput(customNameStr);
 					//OnscreenKeyboard::State::Set(OnscreenKeyboard::Purpose::FavouriteWeaponCurrent, std::string(), 28U, "Enter custom name:");
 					//OnscreenKeyboard::State::arg1._uint = currentPedWeapon;
 				}
@@ -1045,6 +1058,18 @@ namespace sub
 		void Sub_CategoriesList()
 		{
 			int i;
+
+			if (g_WeaponOpsPedOverride != 0)
+			{
+				Static_241 = g_WeaponOpsPedOverride;
+				Static_240 = g_WeaponOpsPlayerOverride;
+			}
+			else
+			{
+				Static_241 = PLAYER_PED_ID();
+				Static_240 = PLAYER_ID();
+			}
+
 			auto& ped = Static_241;
 			Hash pedCurrentWeapon; GET_CURRENT_PED_WEAPON(ped, &pedCurrentWeapon, 1);
 
@@ -1149,6 +1174,11 @@ namespace sub
 			auto& ped = Static_241;
 			NETWORK_REQUEST_CONTROL_OF_ENTITY(ped);
 
+			const bool isBodyguardContext =
+				(g_WeaponTargetType == WeaponTargetType::TargetPed) &&
+				(g_WeaponTargetPed == ped);
+
+
 			Hash pedCurrentWeapon; GET_CURRENT_PED_WEAPON(ped, &pedCurrentWeapon, 1);
 
 			Hash whash;
@@ -1197,7 +1227,6 @@ namespace sub
 					SET_CURRENT_PED_WEAPON(ped, whash, true);
 				}
 			}
-
 			bool it_FillAmmo = 0;
 			AddOption("Fill Ammo", it_FillAmmo); if (it_FillAmmo)
 			{
@@ -1266,26 +1295,44 @@ namespace sub
 
 			AddTitle("Attachments & Tints");
 
+			WEAPON::GIVE_WEAPON_TO_PED(ped, whash, 9999, false, true);
+			WEAPON::SET_CURRENT_PED_WEAPON(ped, whash, true);
+
 			for (auto& comp : *selWeaponComponents)
 			{
-				//if (!comp.name.length()) continue; // Some problem due to initializer lists/ operator= happened. Blank first element idk.
 				bool bAttachmentPressed = false;
+
+				if (!WEAPON::DOES_WEAPON_TAKE_WEAPON_COMPONENT(whash, comp.hash))
+					continue;
+
 				bool bHasComponent = HAS_PED_GOT_WEAPON_COMPONENT(ped, whash, comp.hash) != 0;
+
 				if (bHasComponent && boost::to_upper_copy(comp.name).find("CAMO") != std::string::npos)
 				{
 					bool bLiveryPressed = false, bLivery_plus = false, bLivery_minus = false;
 					int currentLivery = GET_PED_WEAPON_COMPONENT_TINT_INDEX(ped, whash, comp.hash);
-					AddTexter(comp.name, 0, std::vector<std::string>{Game::GetGXTEntry("WCT_C_TINT_" + std::to_string(currentLivery))}, bLiveryPressed, bLivery_plus, bLivery_minus);
+
+					AddTexter(comp.name, 0,
+						std::vector<std::string>{Game::GetGXTEntry("WCT_C_TINT_" + std::to_string(currentLivery))},
+						bLiveryPressed, bLivery_plus, bLivery_minus);
+
 					if (bLivery_plus && currentLivery < 31) { currentLivery++; bLiveryPressed = true; }
 					else if (bLivery_minus && currentLivery > 0) { currentLivery--; bLiveryPressed = true; }
-					if (bLiveryPressed) { SET_PED_WEAPON_COMPONENT_TINT_INDEX(ped, whash, comp.hash, currentLivery); }
+
+					if (bLiveryPressed)
+					{
+						SET_PED_WEAPON_COMPONENT_TINT_INDEX(ped, whash, comp.hash, currentLivery);
+					}
 				}
 				else
 				{
-					AddTickol(comp.name, bHasComponent, bAttachmentPressed, bAttachmentPressed, TICKOL::WEAPONTHING); if (bAttachmentPressed)
+					AddTickol(comp.name, bHasComponent, bAttachmentPressed, bAttachmentPressed, TICKOL::WEAPONTHING);
+
+					if (bAttachmentPressed)
 					{
-						bHasComponent ?
-							REMOVE_WEAPON_COMPONENT_FROM_PED(ped, whash, comp.hash) :
+						if (bHasComponent)
+							REMOVE_WEAPON_COMPONENT_FROM_PED(ped, whash, comp.hash);
+						else
 							GIVE_WEAPON_COMPONENT_TO_PED(ped, whash, comp.hash);
 					}
 				}
@@ -1299,12 +1346,15 @@ namespace sub
 				for (int i = 0; i < selWeaponTints->size(); i++)
 				{
 					bool bTintPressed = false;
-					AddTickol(selWeaponTints->at(i), (currentTint == i), bTintPressed, null, TICKOL::WEAPONTHING); if (bTintPressed)
+					AddTickol(selWeaponTints->at(i), (currentTint == i), bTintPressed, null, TICKOL::WEAPONTHING);
+
+					if (bTintPressed)
 					{
 						SET_PED_WEAPON_TINT_INDEX(ped, whash, i);
 					}
 				}
 			}
+
 
 		}
 		void Sub_Parachute()
@@ -1545,7 +1595,7 @@ namespace sub
 						Game::Print::PrintBottomLeft("~r~Error:~s~ Unable to save loadout.");
 				}
 				else
-					Game::Print::PrintError_InvalidInput();
+					Game::Print::PrintError_InvalidInput(inputStr);
 				//OnscreenKeyboard::State::Set(OnscreenKeyboard::Purpose::SaveLoadoutToFile, std::string(), 28U, "Enter loadout name:");
 				//OnscreenKeyboard::State::arg1._int = _ped;
 				//OnscreenKeyboard::State::arg2._ptr = reinterpret_cast<std::string*>(&_dir);
@@ -1569,7 +1619,7 @@ namespace sub
 					}
 				}
 				else
-					Game::Print::PrintError_InvalidInput();
+					Game::Print::PrintError_InvalidInput(inputStr);
 				return;
 				// No OnscreenKeyboard!
 			}
@@ -1611,7 +1661,7 @@ namespace sub
 						Game::Print::PrintBottomCentre("~r~Error~s~ renaming file.");
 				}
 				else
-					Game::Print::PrintError_InvalidInput();
+					Game::Print::PrintError_InvalidInput(inputStr);
 				//OnscreenKeyboard::State::Set(OnscreenKeyboard::Purpose::RenameLoadoutFile, std::string(), 28U, "Enter new name:");
 				//OnscreenKeyboard::State::arg1._ptr = reinterpret_cast<void*>(&_name);
 				//OnscreenKeyboard::State::arg2._ptr = reinterpret_cast<void*>(&_dir);

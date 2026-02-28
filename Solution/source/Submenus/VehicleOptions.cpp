@@ -135,6 +135,9 @@ namespace sub
 
 		AddTitle("Vehicle Options");
 
+		AddOption("Teleport Into Closest Vehicle", VehicleOpsTeleportClosestCar_);
+		AddOption("Vehicle Spawner", obj_funny_veh_so_frz__off, nullFunc, SUB::SPAWNVEHICLE);
+		AddOption("Menyoo Customs", VehicleOps_sub_modshop, nullFunc, -1, true);
 		if (myVehicleModel.IsCargobob())
 			AddLocal("Cargobob Magnet", myVehicle.IsCargobobHookActive(CargobobHook::Magnet), bToggleCargobobMagnet, bToggleCargobobMagnet);
 		if (DOES_VEHICLE_ALLOW_RAPPEL(g_myVeh))
@@ -1103,7 +1106,7 @@ namespace sub
 				}
 				catch (...)
 				{
-					Game::Print::PrintError_InvalidInput();
+					Game::Print::PrintError_InvalidInput(inputStr);
 				}
 			}
 			//OnscreenKeyboard::State::Set(OnscreenKeyboard::Purpose::SetArg1Float, std::to_string(_global_MultiPlatNeons_Intensity), 9U, "Enter Value:", std::to_string(_global_MultiPlatNeons_Intensity));

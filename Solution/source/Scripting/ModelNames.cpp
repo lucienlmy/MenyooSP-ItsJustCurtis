@@ -160,6 +160,38 @@ void PopulatePedModelsArray()
 		std::sort(hlist->begin(), hlist->end(), [](const std::pair<std::string, std::string>& a, const std::pair<std::string, std::string>& b) -> bool { return boost::to_lower_copy(a.second) < boost::to_lower_copy(b.second); });
 	}
 }
+
+std::string getVehicleClassName(VehicleClass vclass)
+{
+	switch (vclass)
+	{
+	case VehicleClass::Openwheel: return "Openwheel";
+	case VehicleClass::Super: return "Super";
+	case VehicleClass::Sport: return "Sport";
+	case VehicleClass::SportsClassic: return "SportsClassic";
+	case VehicleClass::Coupe: return "Coupe";
+	case VehicleClass::Muscle: return "Muscle";
+	case VehicleClass::Offroad: return "Offroad";
+	case VehicleClass::SUV: return "SUV";
+	case VehicleClass::Sedan: return "Sedan";
+	case VehicleClass::Compact: return "Compact";
+	case VehicleClass::Van: return "Van";
+	case VehicleClass::Service: return "Service";
+	case VehicleClass::Train: return "Train";
+	case VehicleClass::Emergency: return "Emergency";
+	case VehicleClass::Motorcycle: return "Motorcycle";
+	case VehicleClass::Cycle: return "Bicycle";
+	case VehicleClass::Plane: return "Plane";
+	case VehicleClass::Helicopter: return "Helicopter";
+	case VehicleClass::Boat: return "Boat";
+	case VehicleClass::Industrial: return "Industrial";
+	case VehicleClass::Commercial: return "Commercial";
+	case VehicleClass::Utility: return "Utility";
+	case VehicleClass::Military: return "Military";
+	default: return "Other";
+	}
+}
+
 void PopulateVehicleModelsArray()
 {
 	g_vehHashes.clear();
@@ -202,27 +234,37 @@ void PopulateVehicleModelsArray()
 		{ VehicleClass::Train, &g_vehHashes_TRAIN },{ VehicleClass::Emergency, &g_vehHashes_EMERGENCY },{ VehicleClass::Motorcycle, &g_vehHashes_MOTORCYCLE },
 		{ VehicleClass::Cycle, &g_vehHashes_BICYCLE },{ VehicleClass::Plane, &g_vehHashes_PLANE },{ VehicleClass::Helicopter, &g_vehHashes_HELICOPTER },{ VehicleClass::Boat, &g_vehHashes_BOAT }
 	};
-
+	
 	const bool isMinGameVersion3095 = GTAmemory::GetGameVersion() >= eGameVersion::VER_1_0_3095_0;
 	bool tmpEnhanced = GTAmemory::GetIsEnhanced();
 	for (int d = 0x0; d < 0x20; d++)
 	{
 		for (auto& dd : hashes[d])
 		{
+			addlog(ige::LogType::LOG_TRACE, "Read vehicle model: " + std::to_string(Model(dd).hash) + " - " + Model(dd).VehicleModelName(), __FILENAME__);
 			if (std::find(g_vehHashes.begin(), g_vehHashes.end(), Model(dd)) == g_vehHashes.end())
 			{
-				if (tmpEnhanced || !isMinGameVersion3095 || !IS_VEHICLE_GEN9_EXCLUSIVE_MODEL(dd))
+				if (g_isEnhanced || !isMinGameVersion3095 || !IS_VEHICLE_GEN9_EXCLUSIVE_MODEL(dd))
 				{
 					if (Model(dd).VehicleModelName().starts_with("drift"))
 					{
+						addlog(ige::LogType::LOG_TRACE, "  - Add to Vehicle Class Drift", __FILENAME__);
 						g_vehHashes_DRIFT.push_back(dd);
 					}
 					else
 					{
+						if (g_loglevel == 4)
+						{
+							std::string vclassName = getVehicleClassName(VehicleClass(d));
+							addlog(ige::LogType::LOG_TRACE, "  - Add to Vehicle Class " + vclassName, __FILENAME__);
+						}
 						auto dit = vDestMap.find(VehicleClass(d));
 						if (dit != vDestMap.end())
 							dit->second->push_back(dd);
-						else g_vehHashes_OTHER.push_back(dd);
+						else
+						{
+							g_vehHashes_OTHER.push_back(dd);
+						}
 					}
 					g_vehHashes.push_back(dd);
 				}

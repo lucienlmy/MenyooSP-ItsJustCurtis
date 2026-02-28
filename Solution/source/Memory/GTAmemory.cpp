@@ -55,6 +55,7 @@ GetModelInfo_t GetModelInfo;
 std::unordered_map<unsigned int, std::string> g_vehicleHashes;
 CallHook<InitVehicleArchetype_t>* g_InitVehicleArchetypeLegacy = nullptr;
 CVehicleModelInfo* initVehicleArchetype_stub(const char* name, bool a2, unsigned int a3) {
+	addlog(ige::LogType::LOG_DEBUG, "getting hashkey for " + std::string(name), __FILENAME__);
 	g_vehicleHashes.insert({ GET_HASH_KEY(name), boost::to_lower_copy(name) });
 	return g_InitVehicleArchetypeLegacy->fn(name, a2, a3);
 }
@@ -1731,6 +1732,8 @@ void GTAmemory::InitEnhancedPools() {
 	
 	_SpSnow = SpSnow();
 }
+		_SpSnow = SpSnow();
+	}
 }
 
 
@@ -2802,12 +2805,7 @@ void GeneralGlobalHax::SetPlayerHeight(float value)
 {
 	if (g_isEnhanced) return;
 	auto baddr = *GeneralGlobalHax::WorldPtrPtr();
-	if (baddr)
-	{
-		auto gameVersion = GTAmemory::GetGameVersion();
-		if (gameVersion <= eGameVersion::VER_1_0_2802_0)
-			*(GetMultilayerPointer<float*>(baddr, std::vector<DWORD>{0x8, 0x88})) = value;
-	}
+	if (baddr)	*(GetMultilayerPointer<float*>(baddr, std::vector<DWORD>{0x8, 0x88})) = value;
 }
 
 // For 3521 (Legacy) and 814.9 (Enhanced), PlayerSwimSpeed is at {0x8, 0x10A8, 0x1C8}. 
@@ -2945,6 +2943,9 @@ float* GeneralGlobalHax::GetVehicleBoostChargePtr()
 }
 
 std::string GTAmemory::GetVehicleModelName(Hash hash) {
+	if(g_vehicleHashes.empty()) {
+		addlog(ige::LogType::LOG_ERROR, "g_vehicleHashes Empty", __FILENAME__);
+	}
 	auto modelIt = g_vehicleHashes.find(hash);
 	if (modelIt != g_vehicleHashes.end()) return modelIt->second;
 	return "NOTFOUND";
