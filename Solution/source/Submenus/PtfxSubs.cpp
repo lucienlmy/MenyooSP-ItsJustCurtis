@@ -3397,13 +3397,13 @@ namespace sub
             int startIndex = ptfxPage * ITEMS_PER_PAGE;
             int endIndex = min(startIndex + ITEMS_PER_PAGE, totalItems);
 
-            bool itemChangeLeft = 0;
-            bool itemChangeRight = 0;
+            bool itemCountMinus = 0;
+            bool itemCountPlus = 0;
             bool detectKeypress = 0;
             bool bShortcutToggleFavesPressed = 0;
             std::string pageLabel = "Page " + std::to_string(ptfxPage + 1) + " / " + std::to_string(totalPages);
             AddTitle("FX - " + pageLabel);
-            AddNumber("Items Per Page", ITEMS_PER_PAGE, 0, null, itemChangeRight, itemChangeLeft);
+            AddNumber("Items Per Page", ITEMS_PER_PAGE, 0, null, itemCountPlus, itemCountMinus);
             AddOption("Favourites", detectKeypress, nullFunc, SUB::PTFX_FAVORITES); if (detectKeypress) 
                 g_lastSubmenuSource = Menu::currentsub_ar[Menu::currentsub_ar_index];
             AddToggle("Only Show Favorites", showOnlyFaves);
@@ -3463,13 +3463,13 @@ namespace sub
                 }
             }
             // Respond to left/right input for modifying items per page
-            if (itemChangeRight)
+            if (itemCountPlus)
             {
                 if (ITEMS_PER_PAGE < ITEMS_PER_PAGE_MAX)
                     ITEMS_PER_PAGE += 1;
             }
 
-            if (itemChangeLeft)
+            if (itemCountMinus)
             {
                 if (ITEMS_PER_PAGE > ITEMS_PER_PAGE_MIN)
                     ITEMS_PER_PAGE -= 1;
@@ -3477,11 +3477,11 @@ namespace sub
             // Block navigation input if on first page
             if (ptfxPage + 1 != 0 && totalPages != 0 && *Menu::currentopATM != 1)
             {
-                if (itemChangeLeft)
+                if (IsOptionLPressed())
                 {
                     ptfxPage = (ptfxPage - 1 + totalPages) % totalPages;
                 }
-                if (itemChangeRight)
+                if (IsOptionRPressed())
                 {
                     ptfxPage = (ptfxPage + 1) % totalPages;
                 }

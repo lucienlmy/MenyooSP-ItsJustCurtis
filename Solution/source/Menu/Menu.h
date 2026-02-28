@@ -200,9 +200,9 @@ public:
 };
 
 
-//bool IsOptionPressed();
-//bool IsOptionRPressed();
-//bool IsOptionLPressed();
+bool IsOptionPressed();
+bool IsOptionRPressed();
+bool IsOptionLPressed();
 
 extern bool null;
 extern int inull;
