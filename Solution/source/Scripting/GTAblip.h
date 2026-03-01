@@ -931,7 +931,7 @@ public:
 
 	void SetSelectableOnMap(bool selectable);
 
-	void SetPriority(int priority);
+	//void SetPriority(int priority);
 
 	void SetRotationWithFloat(float heading);
 
@@ -943,8 +943,8 @@ public:
 
 //New functions
 
-	int GetPriority() const;
-	void SetDisplayMode(int value);
+	//int GetPriority() const;
+	//void SetDisplayMode(int value);
 
 //New functions end here
 
@@ -969,7 +969,7 @@ public:
 private:
 	int mHandle;
 	int mConeColour = 3;
-	int mPriority = 2;
+	//int mPriority = 2;
 };
 
 
