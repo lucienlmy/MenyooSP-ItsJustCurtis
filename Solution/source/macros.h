@@ -17,7 +17,7 @@
 
 
 
-#define MENYOO_CURRENT_VER_ "2.2.2a8"
+#define MENYOO_CURRENT_VER_ "2.2.2a9"
 
 #define GAME_PLAYERCOUNT 30
 
