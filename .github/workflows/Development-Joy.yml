@@ -1,0 +1,301 @@
+name: Development-Joy【Master_Build 复制改进】
+
+on:
+  push:
+    branches: [ "Development-Joy" ]
+  workflow_dispatch:
+  #workflow_run:
+  #  workflows: ["MSBuild"]
+  #  types:
+  #    - completed
+
+
+
+env:
+  BUILD_CONFIGURATION: Release
+  CANCELJOB: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  check-version-and-merge:
+    runs-on: ubuntu-latest
+    outputs:
+      CANCELJOB: ${{ steps.set_output.outputs.CANCELJOB }}
+
+    steps:
+      - name: Checkout repository
+        if: env.CANCELJOB != 'true'  
+        uses: actions/checkout@v3
+
+      - name: Extract version from macros.h
+        id: extract_version
+        if: env.CANCELJOB != 'true' 
+        run: |
+          VERSION=$(grep '#define MENYOO_CURRENT_VER_' Solution/source/macros.h | awk '{print $3}' | tr -d '"')
+          echo "VERSION=v$VERSION" >> $GITHUB_ENV
+          echo "Extracted version: $VERSION"
+          
+      - name: Check if tag already exists
+        if: env.CANCELJOB != 'true' 
+        run: |
+          VERSION=${{ env.VERSION }}
+          echo "Checking for tag: $VERSION"  
+          RELEASE_LIST=$(gh release list)
+          TAGS=$(echo "$RELEASE_LIST" | awk '{print $1}')
+          echo "$TAGS"
+          
+          echo "Checking if tag exists:"
+          for tag in $TAGS; do
+            if [ "$tag" = "$VERSION" ]; then
+              echo "Tag $VERSION already exists. Will overwrite the existing release."
+              exit 0
+            fi
+          done
+          
+          echo "Tag $VERSION does not exist. Proceeding with new release."
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: Check version pattern and merge
+        id: check_version
+        if: env.CANCELJOB != 'true' 
+        run: |
+          VERSION=${{ env.VERSION }}
+          echo "Checking version pattern: $VERSION"
+          if [[ $GITHUB_REF == "refs/heads/main" ]]; then
+            echo "Already on main branch. Skipping merge check."
+            exit 0
+          fi
+
+          # 获取当前分支名
+          CURRENT_BRANCH=$(echo $GITHUB_REF | sed 's/refs\/heads\///')
+          echo "Current branch: $CURRENT_BRANCH"
+
+          # Function to check for existing PR with the same version
+          check_pr_exists() {
+            PR_LIST=$(gh pr list --head $CURRENT_BRANCH --base main --state open --json title,body)
+            PR_EXIST=$(echo "$PR_LIST" | jq -r --arg VERSION "$VERSION" '.[] | select((.title | contains($VERSION)) or (.body | contains($VERSION)))')
+            [ -n "$PR_EXIST" ]
+          }
+
+          if [[ $VERSION =~ ^v?[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Version is a full release. Creating pull request to merge into main."
+            echo "## Check for existing PR"
+            if check_pr_exists; then
+              echo "PR already exists with version $VERSION."
+              echo "CANCELJOB=true" >> $GITHUB_ENV
+              exit 0
+            fi
+            echo "Creating new PR."
+            gh pr create --title "Release $VERSION" --body "Merging $CURRENT_BRANCH into main for release $VERSION" --base main --head $CURRENT_BRANCH
+            echo "CANCELJOB=true" >> $GITHUB_ENV
+            exit 0
+          elif [[ $VERSION =~ ^v?[0-9]+\.[0-9]+\.[0-9]+(a|b|rc)[0-9]+$ ]]; then
+            echo "Version is a pre-release. Proceeding with pre-release build."
+          else
+            echo "Version is invalid or a development version. Cancelling workflow."
+            echo "CANCELJOB=true" >> $GITHUB_ENV
+            exit 0
+          fi
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set output
+        id: set_output
+        run: echo "CANCELJOB=${{ env.CANCELJOB }}" >> $GITHUB_OUTPUT
+
+  build:
+    runs-on: windows-latest
+    needs: check-version-and-merge
+
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        submodules: recursive
+
+    - name: Generate solution with Premake
+      run: Solution/external/premake/premake5.exe vs2022
+
+    - name: Add MSBuild to PATH
+      uses: microsoft/setup-msbuild@v1.1
+
+    - name: Build
+      working-directory: ${{env.GITHUB_WORKSPACE}}
+      run: msbuild /m /p:Configuration=${{env.BUILD_CONFIGURATION}} /p:Platform=x64 Solution/Menyoo.sln -verbosity:minimal
+      
+    - name: Upload a Build Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        # Artifact name
+        name: MenyooSP
+        path: |
+          Solution/source/_Build/bin/Release/
+          !Solution/source/_Build/bin/Release/Trash/
+          !Solution/source/_Build/bin/Release/*.map
+  
+    - name: Cancel Workflow Action if build fails
+      uses: vishnudxb/cancel-workflow@v1.2
+      if: failure()
+      with:
+        repo: MAFINS/MenyooSP
+        workflow_id: ${{ github.run_id }}
+        access_token: ${{ github.token }}
+
+
+  pre-release:
+    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/Development' || github.ref == 'refs/heads/Development-Joy') && (needs.check-version-and-merge.outputs.CANCELJOB != 'true' || !needs.check-version-and-merge.outputs.CANCELJOB)
+    needs: build
+    permissions: write-all
+    name: "Pre Release"
+    runs-on: windows-latest
+
+    steps:
+      #- name: Wait on artifact upload
+        #uses: lewagon/wait-on-check-action@v1.1.2
+        #with:
+          #ref: ${{github.ref}}
+          #check-name: 'Upload a Build Artifact'
+          #repo-token: ${{ secrets.GITHUB_TOKEN }}
+          #wait-interval: 10
+          
+      - uses: actions/checkout@v3
+
+      #- name: Download workflow artifact
+        #uses: dawidd6/action-download-artifact@v2.23.0
+        #with:
+         #github_token: ${{secrets.GITHUB_TOKEN}}
+         #workflow_conclusion: ""
+         #name: MenyooSP
+         #skip_unpack: true
+      - uses: actions/download-artifact@v4
+     
+      - name: Extract version from macros.h
+        id: extract_version
+        run: |
+          Select-String -Path "Solution\source\macros.h" -Pattern '#define MENYOO_CURRENT_VER_' | ForEach-Object {
+            $_.Line -match '#define MENYOO_CURRENT_VER_\s+"(.*?)"' | Out-Null
+            $matches[1]
+          } | Out-File -FilePath version.txt
+          $VERSION = Get-Content version.txt
+          echo "VERSION=v$VERSION" >> $env:GITHUB_ENV
+          echo "Extracted version: $VERSION"
+      - name: Get commit messages
+        id: get_commits
+        shell: pwsh
+        run: |
+          # 确保完整克隆
+          git fetch --prune --unshallow
+          
+          # 获取本次推送的提交范围
+          $beforeSha = "${{ github.event.before }}"
+          $afterSha = "${{ github.event.after }}"
+          $features = @()
+          $bugFixes = @()
+          $others = @()
+          
+          Write-Host "获取从 $beforeSha 到 $afterSha 的提交"
+          
+          # 处理首次推送的情况（beforeSha 为空）
+          if ([string]::IsNullOrEmpty($beforeSha)) {
+              Write-Host "首次推送，只显示最新的提交"
+              # 只显示最新的一个提交
+              $hash = git rev-parse --short=7 HEAD
+              $message = git log -1 --format="%s" HEAD
+              $author = git log -1 --format="%an" HEAD
+              $others += "- ${hash}: ${message} (${author})"
+          } else {
+              # 获取本次推送的所有提交
+              $commits = git rev-list --reverse "$beforeSha..$afterSha"
+              
+              # 限制提交数量，最多处理10个最近的提交
+              $limitedCommits = $commits | Select-Object -Last 10
+              
+              foreach ($commit in $limitedCommits) {
+                  # 获取单个提交的详细信息
+                  $hash = git rev-parse --short=7 $commit
+                  $message = git log -1 --format="%s" $commit
+                  $author = git log -1 --format="%an" $commit
+                  
+                  # 根据提交信息分类
+                  if ($message -match 'feat' -or $message -match 'feature' -or $message -match 'add' -or $message -match 'added') {
+                      $features += "- ${message} (${author})"
+                  } elseif ($message -match 'fix' -or $message -match 'bug' -or $message -match 'fixed' -or $message -match 'repair') {
+                      $bugFixes += "- ${message} (${author})"
+                  } else {
+                      $others += "- ${message} (${author})"
+                  }
+              }
+          }
+          
+          # 构建提交信息
+          $formattedCommits = @()
+          
+          if ($features.Count -gt 0) {
+              $formattedCommits += "## Features"
+              $features | ForEach-Object { $formattedCommits += $_ }
+              $formattedCommits += ""
+          }
+          
+          if ($bugFixes.Count -gt 0) {
+              $formattedCommits += "## Bug Fixes"
+              $bugFixes | ForEach-Object { $formattedCommits += $_ }
+              $formattedCommits += ""
+          }
+          
+          if ($others.Count -gt 0) {
+              $formattedCommits += "## Other Changes"
+              $others | ForEach-Object { $formattedCommits += $_ }
+              $formattedCommits += ""
+          }
+          
+          if ($formattedCommits.Count -eq 0) {
+              Write-Host "未找到提交，使用最新提交"
+              $hash = git rev-parse --short=7 HEAD
+              $message = git log -1 --format="%s" HEAD
+              $author = git log -1 --format="%an" HEAD
+              $formattedCommits += "- ${hash}: ${message} (${author})"
+          } elseif ($commits.Count -gt 10) {
+              # 如果提交数量超过10个，添加省略说明
+              $formattedCommits += "... 还有 $($commits.Count - 10) 个提交未显示"
+          }
+          
+          # 将提交信息写入输出
+          $commitMessage = $formattedCommits -join "`n"
+          echo "commit_message<<EOF" >> $env:GITHUB_OUTPUT
+          echo "$commitMessage" >> $env:GITHUB_OUTPUT
+          echo "EOF" >> $env:GITHUB_OUTPUT
+          
+          Write-Host "本次推送的提交:"
+          Write-Host $commitMessage
+      - name: Zip artifact for deployment
+        run: Compress-Archive -Path "MenyooSP/*" -DestinationPath "MenyooSP.zip"
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.VERSION }}
+          name: ${{ env.VERSION }}
+          body: |
+            # 版本发布说明:
+
+            ## 更新内容
+            ${{ steps.get_commits.outputs.commit_message }}
+            
+            ## 提交详情
+            ${{ github.event.head_commit.message }}
+            
+            ## 其他信息
+            - 发布时间: ${{ format(github.event.head_commit.timestamp, 'yyyy-MM-dd HH:mm:ss') }}
+            - 分支: ${{ github.ref_name }}
+            - 构建: [Workflow Run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+            
+            完整更新日志: https://github.com/${{ github.repository }}/commits/${{ github.sha }}
+          draft: false
+          prerelease: ${{ github.ref_name != 'main' }}
+          overwrite: true
+          files: MenyooSP.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
