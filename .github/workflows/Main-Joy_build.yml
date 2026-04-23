@@ -2,7 +2,7 @@ name: Main-Joy
 
 on:
   push:
-    branches: [ "Main-Joy"]
+    branches: [ "Main-Joy","Development-Joy" ]
   #workflow_run:
   #  workflows: ["MSBuild"]
   #  types:

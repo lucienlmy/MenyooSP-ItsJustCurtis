@@ -7,7 +7,7 @@ on:
   #  workflows: ["MSBuild"]
   #  types:
   #    - completed
-      
+
 
 
 env:
@@ -70,10 +70,14 @@ jobs:
             exit 0
           fi
 
+          # 获取当前分支名
+          CURRENT_BRANCH=$(echo $GITHUB_REF | sed 's/refs\/heads\///')
+          echo "Current branch: $CURRENT_BRANCH"
+
           # Function to check for existing PR with the same version
           check_pr_exists() {
-            PR_LIST=$(gh pr list --head Development --base main --state open --json title,body)
-            PR_EXIST=$(echo "$PR_LIST" | jq -r --arg VERSION "$VERSION" '.[] | select((.title | contains($VERSION)) or (.body | contains($VERSION)))')
+            PR_LIST=$(gh pr list --head $CURRENT_BRANCH --base main --state open --json title,body)
+            PR_EXIST=$(echo "$PR_LIST" | jq -r --arg VERSION "$VERSION" '.[] | select((.title | contains($VERSION)) or (.body | contains($VERSION)))")
             [ -n "$PR_EXIST" ]
           }
 
@@ -86,7 +90,7 @@ jobs:
               exit 0
             fi
             echo "Creating new PR."
-            gh pr create --title "Release $VERSION" --body "Merging development into main for release $VERSION" --base main --head Development
+            gh pr create --title "Release $VERSION" --body "Merging $CURRENT_BRANCH into main for release $VERSION" --base main --head $CURRENT_BRANCH
             echo "CANCELJOB=true" >> $GITHUB_ENV
             exit 0
           elif [[ $VERSION =~ ^v?[0-9]+\.[0-9]+\.[0-9]+(a|b|rc)[0-9]+$ ]]; then
@@ -143,7 +147,7 @@ jobs:
 
 
   pre-release:
-    if: github.ref == 'refs/heads/main' || (github.ref == 'refs/heads/Development' && needs.check-version-and-merge.outputs.CANCELJOB != 'true')
+    if: github.ref == 'refs/heads/main' || (github.ref == 'refs/heads/Development' && needs.check-version-and-merge.outputs.CANCELJOB != 'true') || (github.ref == 'refs/heads/Development-Joy' && needs.check-version-and-merge.outputs.CANCELJOB != 'true')
     needs: build
     permissions: write-all
     name: "Pre Release"
