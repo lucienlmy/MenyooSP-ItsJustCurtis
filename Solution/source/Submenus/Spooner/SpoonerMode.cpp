@@ -54,9 +54,28 @@ namespace sub::Spooner
 		bool bEnabled = false;
 		bool bIsSomethingHeld = false;
 		bool bHeldEntityHasCollision = true;
+		eEntityEditMode entityEditMode = eEntityEditMode::Disabled;
+		bool bEntityEditRotationMode = false;
+		bool bGizmoCameraLocked = false;
 		Camera spoonerModeCamera;
 		float spoonerModeCameraCamDistance = 5.0f;
 		eSpoonerModeMode& spoonerModeMode = Settings::spoonerModeMode;
+
+		SpoonerStats GetSpoonerStats()
+		{
+			SpoonerStats stats = { 0, 0, 0, 0 };
+			stats.totalNumEntities = (UINT)Databases::EntityDb.size();
+			for (auto& spoonerEntity : Databases::EntityDb)
+			{
+				switch (spoonerEntity.type)
+				{
+				case EntityType::PROP: stats.totalNumProps++; break;
+				case EntityType::PED: stats.totalNumPeds++; break;
+				case EntityType::VEHICLE: stats.totalNumVehicles++; break;
+				}
+			}
+			return stats;
+		}
 
 		bool IsHotkeyPressed()
 		{
@@ -253,32 +272,6 @@ namespace sub::Spooner
 			if (SpoonerMode::bEnabled)
 			{
 				HIDE_HUD_AND_RADAR_THIS_FRAME();
-
-				//if (setting)
-				{
-					UINT totalNumProps = 0, totalNumPeds = 0, totalNumVehicles = 0;
-					UINT totalNumEntities = (UINT)Databases::EntityDb.size();
-					for (auto& eee : Databases::EntityDb)
-					{
-						switch (eee.type)
-						{
-						case EntityType::PROP: totalNumProps++; break;
-						case EntityType::PED: totalNumPeds++; break;
-						case EntityType::VEHICLE: totalNumVehicles++; break;
-						}
-					}
-					bool bRightJus = get_xcoord_at_menu_leftEdge(0.0f, false) < 0.5f; // left edge of menu is on the left of the centre of the screen
-					float infoX = bRightJus ? 0.90f : 0.008f;
-					float infoY = xyzhCoords ? 0.184f : 0.064f;
-					Game::Print::SetupDraw(font_xyzh, Vector2(0.37f, 0.37f), false, bRightJus, true);
-					Game::Print::drawstring("Total Entities Spawned: " + std::to_string(totalNumEntities), infoX, infoY);
-					Game::Print::SetupDraw(font_xyzh, Vector2(0.37f, 0.37f), false, bRightJus, true);
-					Game::Print::drawstring("Objects Spawned: " + std::to_string(totalNumProps), infoX, infoY + 0.03f);
-					Game::Print::SetupDraw(font_xyzh, Vector2(0.37f, 0.37f), false, bRightJus, true);
-					Game::Print::drawstring("Peds Spawned: " + std::to_string(totalNumPeds), infoX, infoY + 0.06f);
-					Game::Print::SetupDraw(font_xyzh, Vector2(0.37f, 0.37f), false, bRightJus, true);
-					Game::Print::drawstring("Vehicles Spawned: " + std::to_string(totalNumVehicles), infoX, infoY + 0.09f);
-				}
 
 				if (!freeCam.Exists())
 				{
@@ -585,15 +578,23 @@ namespace sub::Spooner
 					float movementSensitivity = Settings::cameraMovementSensitivityKeyboard;
 					if (IS_DISABLED_CONTROL_PRESSED(0, INPUT_SPRINT))
 						movementSensitivity = 4.0f * movementSensitivity;
+					
+					// blocks camera movement while we are using the keyboard to edit entity pos / rot
+					if (entityEditMode != eEntityEditMode::Keyboard)
+					{
+						nextOffset.x = GET_DISABLED_CONTROL_NORMAL(0, INPUT_MOVE_LR) * movementSensitivity;
+						nextOffset.y = -GET_DISABLED_CONTROL_NORMAL(0, INPUT_MOVE_UD) * movementSensitivity;
+						nextOffset.z = IsKeyDown(VirtualKey::X) ? movementSensitivity / 2 : IsKeyDown(VirtualKey::Z) ? -movementSensitivity / 2 : 0.0f;
+					}
 
-					nextOffset.x = GET_DISABLED_CONTROL_NORMAL(0, INPUT_MOVE_LR) * movementSensitivity;
-					nextOffset.y = -GET_DISABLED_CONTROL_NORMAL(0, INPUT_MOVE_UD) * movementSensitivity;
-					nextOffset.z = IsKeyDown(VirtualKey::X) ? movementSensitivity / 2 : IsKeyDown(VirtualKey::Z) ? -movementSensitivity / 2 : 0.0f;
-
-					float rotationSensitivity = Settings::cameraRotationSensitivityMouse;
-					nextRot.z = -GET_DISABLED_CONTROL_NORMAL(0, INPUT_LOOK_LR) * rotationSensitivity;
-					nextRot.x = -GET_DISABLED_CONTROL_NORMAL(0, INPUT_LOOK_UD) * rotationSensitivity;
-					nextRot.y = !IS_DISABLED_CONTROL_PRESSED(2, INPUT_PARACHUTE_BRAKE_RIGHT) ? (IS_DISABLED_CONTROL_PRESSED(2, INPUT_PARACHUTE_BRAKE_LEFT) ? -2.0f : 0.0f) : 2.0f;
+					// blocks camera rotation while we are using the gizmo to edit entity pos / rot
+					if (!bGizmoCameraLocked || entityEditMode != eEntityEditMode::Gizmo)
+					{
+						float rotationSensitivity = Settings::cameraRotationSensitivityMouse;
+						nextRot.z = -GET_DISABLED_CONTROL_NORMAL(0, INPUT_LOOK_LR) * rotationSensitivity;
+						nextRot.x = -GET_DISABLED_CONTROL_NORMAL(0, INPUT_LOOK_UD) * rotationSensitivity;
+						nextRot.y = !IS_DISABLED_CONTROL_PRESSED(2, INPUT_PARACHUTE_BRAKE_RIGHT) ? (IS_DISABLED_CONTROL_PRESSED(2, INPUT_PARACHUTE_BRAKE_LEFT) ? -2.0f : 0.0f) : 2.0f;
+					}
 
 					if (!bIsSomethingHeld || spoonerModeMode == eSpoonerModeMode::GroundEase)
 					{
@@ -659,7 +660,8 @@ namespace sub::Spooner
 						}
 					}
 
-					if (entityInFrontOfCam.Exists() || bIsSomethingHeld)
+					// does not draw the cursor when inside gizmo entity editing mode.
+					if (entityEditMode != eEntityEditMode::Gizmo && (entityInFrontOfCam.Exists() || bIsSomethingHeld))
 					{
 						DRAW_RECT(0.5f, 0.5f, 0.02f, 0.002f, 0, 255, 0, 255, false);
 						DRAW_RECT(0.5f, 0.5f, 0.001f, 0.03f, 0, 255, 0, 255, false);
@@ -855,7 +857,8 @@ namespace sub::Spooner
 							Menu::NewSetMenu(SUB::SPOONER_SELECTEDENTITYOPS);
 						}
 					}
-					else
+					// does not draw the cursor when inside gizmo entity editing mode.
+					else if (entityEditMode != eEntityEditMode::Gizmo)
 					{
 						DRAW_RECT(0.5f, 0.5f, 0.02f, 0.002f, 255, 255, 255, 255, false);
 						DRAW_RECT(0.5f, 0.5f, 0.001f, 0.03f, 255, 255, 255, 255, false);
@@ -937,6 +940,3 @@ namespace sub::Spooner
 	}
 
 }
-
-
-
