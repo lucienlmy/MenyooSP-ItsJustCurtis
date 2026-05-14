@@ -63,7 +63,7 @@ bool IsSafePath(const std::string& path)
 	std::string upper = path;
 	std::transform(upper.begin(), upper.end(), upper.begin(), ::toupper);
 
-	static const std::vector<std::string> reservedNames = {
+	static const char* const reservedNames[] = {
 		"CON", "PRN", "AUX", "NUL",
 		"COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
 		"LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9"
