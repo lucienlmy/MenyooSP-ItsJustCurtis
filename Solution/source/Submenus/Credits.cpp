@@ -83,7 +83,7 @@ namespace sub
             LoadCredits();
 
         bool openPatreon = false;
-        AddOption("Support Menyoo on Patreon", openPatreon);
+        AddOption("Support Menyoo on Patreon", openPatreon, nullFunc, -1, true);
         if (openPatreon)
         {
             ShellExecuteA(
