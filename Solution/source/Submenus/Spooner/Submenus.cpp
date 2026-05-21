@@ -402,7 +402,11 @@ namespace sub
 				std::string inputStr = Game::InputBox("", 28U, "Enter file name:");
 				if (inputStr.length() > 0)
 				{
-					if (FileManagement::SaveDbToFile(_dir + "\\" + inputStr + ".xml", true))
+					if (!IsSafePath(inputStr))
+					{
+						Game::Print::PrintBottomCentre("~r~Error:~s~ Invalid characters in name.");
+					}
+					else if (FileManagement::SaveDbToFile(_dir + "\\" + inputStr + ".xml", true))
 					{
 						Game::Print::PrintBottomLeft("File ~b~saved~s~.");
 					}
@@ -422,7 +426,11 @@ namespace sub
 				std::string inputStr = Game::InputBox("", 28U, "Enter file name:");
 				if (inputStr.length() > 0)
 				{
-					if (FileManagement::SaveWorldToFile(_dir + "\\" + inputStr + ".xml", worldEntities, Databases::MarkerDb))
+					if (!IsSafePath(inputStr))
+					{
+						Game::Print::PrintBottomCentre("~r~Error:~s~ Invalid characters in name.");
+					}
+					else if (FileManagement::SaveWorldToFile(_dir + "\\" + inputStr + ".xml", worldEntities, Databases::MarkerDb))
 					{
 						Game::Print::PrintBottomLeft("File ~b~saved~s~.");
 					}
@@ -432,8 +440,6 @@ namespace sub
 						addlog(ige::LogType::LOG_ERROR, "Attempt to save World file " + inputStr + ".xml failed");
 					}
 				}
-				//OnscreenKeyboard::State::Set(OnscreenKeyboard::Purpose::SpoonerSaveWorldToFile, std::string(), 28U, "Enter file name:");
-				//OnscreenKeyboard::State::arg1._ptr = reinterpret_cast<void*>(&_dir);
 			}
 
 			std::vector<Entity> vSaveRangeEntities;
@@ -449,23 +455,26 @@ namespace sub
 				std::string inputStr = Game::InputBox("", 28U, "Enter file name:");
 				if (inputStr.length() > 0)
 				{
-					std::vector<SpoonerMarker> vSaveRangeMarkers;
-					MarkerManagement::GetAllMarkersInRange(vSaveRangeMarkers, myPos, fSaveRangeRadius);
-
-					if (FileManagement::SaveWorldToFile(_dir + "\\" + inputStr + ".xml", vSaveRangeEntities, vSaveRangeMarkers))
+					if (!IsSafePath(inputStr))
 					{
-						Game::Print::PrintBottomLeft("File ~b~saved~s~.");
+						Game::Print::PrintBottomCentre("~r~Error:~s~ Invalid characters in name.");
 					}
 					else
 					{
-						Game::Print::PrintBottomCentre("~r~Error:~s~ Unable to save file.");
-						addlog(ige::LogType::LOG_ERROR, "Attempt to save Range Markers file " + inputStr + ".xml failed");
+						std::vector<SpoonerMarker> vSaveRangeMarkers;
+						MarkerManagement::GetAllMarkersInRange(vSaveRangeMarkers, myPos, fSaveRangeRadius);
+
+						if (FileManagement::SaveWorldToFile(_dir + "\\" + inputStr + ".xml", vSaveRangeEntities, vSaveRangeMarkers))
+						{
+							Game::Print::PrintBottomLeft("File ~b~saved~s~.");
+						}
+						else
+						{
+							Game::Print::PrintBottomCentre("~r~Error:~s~ Unable to save file.");
+							addlog(ige::LogType::LOG_ERROR, "Attempt to save Range Markers file " + inputStr + ".xml failed");
+						}
 					}
 				}
-				//OnscreenKeyboard::State::Set(OnscreenKeyboard::Purpose::SpoonerSaveRangeToFile, std::string(), 28U, "Enter file name:");
-				//OnscreenKeyboard::State::arg1._float = fSaveRangeRadius;
-				//OnscreenKeyboard::State::arg2._vec3 = new Vector3(myPos);
-				//OnscreenKeyboard::State::arg3._ptr = reinterpret_cast<void*>(&_dir);
 			}
 
 			/*bool bLoadFromFile = false;
@@ -508,7 +517,11 @@ namespace sub
 				std::string inputStr = Game::InputBox("", 28U, "Enter folder name:");
 				if (inputStr.length() > 0)
 				{
-					if (CreateDirectoryA((_dir + "\\" + inputStr).c_str(), NULL) ||
+					if (!IsSafePath(inputStr))
+					{
+						Game::Print::PrintBottomCentre("~r~Error:~s~ Invalid characters in name.");
+					}
+					else if (CreateDirectoryA((_dir + "\\" + inputStr).c_str(), NULL) ||
 						GetLastError() == ERROR_ALREADY_EXISTS)
 					{
 						_dir = _dir + "\\" + inputStr;
@@ -532,8 +545,16 @@ namespace sub
 			bool bFolderBackPressed = false;
 			AddOption("..", bFolderBackPressed); if (bFolderBackPressed)
 			{
-				_dir = _dir.substr(0, _dir.rfind("\\"));
-				Menu::currentop = 6;
+				std::string baseDir = GetPathffA(Pathff::Spooner, false);
+				if (_dir.length() > baseDir.length() && _dir.find(baseDir) == 0)
+				{
+					_dir = _dir.substr(0, _dir.rfind("\\"));
+					Menu::currentop = 6;
+				}
+				else
+				{
+					_dir = baseDir;
+				}
 			}
 
 			if (!vfilnames.empty())
@@ -662,7 +683,11 @@ namespace sub
 				std::string inputStr = Game::InputBox("", 28U, "Enter new name:", _name);
 				if (inputStr.length() > 0)
 				{
-					if (rename(filePath.c_str(), (_dir + "\\" + inputStr + ".xml").c_str()) == 0)
+					if (!IsSafePath(inputStr))
+					{
+						Game::Print::PrintBottomCentre("~r~Error:~s~ Invalid characters in name.");
+					}
+					else if (rename(filePath.c_str(), (_dir + "\\" + inputStr + ".xml").c_str()) == 0)
 					{
 						_name = inputStr;
 						Game::Print::PrintBottomLeft("File ~b~renamed~s~.");
@@ -1046,7 +1071,11 @@ namespace sub
 				std::string inputStr = Game::InputBox("", 28U, "Enter new name:", _name);
 				if (inputStr.length() > 0)
 				{
-					if (rename(filePath.c_str(), (_dir + "\\" + inputStr + ".SP00N").c_str()) == 0)
+					if (!IsSafePath(inputStr))
+					{
+						Game::Print::PrintBottomCentre("~r~Error:~s~ Invalid characters in name.");
+					}
+					else if (rename(filePath.c_str(), (_dir + "\\" + inputStr + ".SP00N").c_str()) == 0)
 					{
 						_name = inputStr;
 						Game::Print::PrintBottomLeft("File ~b~renamed~s~.");
@@ -2753,7 +2782,7 @@ namespace sub
 			for (auto& wc : *WeaponIndivs::vAllWeapons[selectedCategoryIndex])
 			{
 				bool bWeapPressed = false;
-				AddTickol(get_weapon_label(wc.weaponHash, true), currentWeapon == wc.weaponHash, bWeapPressed, bWeapPressed); if (bWeapPressed)
+				AddTickol(GetWeaponLabel(wc.weaponHash, true), currentWeapon == wc.weaponHash, bWeapPressed, bWeapPressed); if (bWeapPressed)
 				{
 					GIVE_DELAYED_WEAPON_TO_PED(thisPed.Handle(), wc.weaponHash, 9999, true);
 					GIVE_WEAPON_TO_PED(thisPed.Handle(), wc.weaponHash, 1, true, false);
