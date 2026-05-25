@@ -1,4 +1,4 @@
-name: Development-Joy【Master_Build 复制改进】
+﻿name: Development-Joy【Master_Build 复制改进】
 
 on:
   push:
@@ -199,13 +199,25 @@ jobs:
       - name: Rename artifact folder
         shell: pwsh
         run: |
-          $sourceFolder = "MenyooSP-${{ env.VERSION }}"
+          $version = "${{ env.VERSION }}"
           $targetFolder = "MenyooSP"
-          if (Test-Path $targetFolder) {
-            Remove-Item -Path $targetFolder -Recurse -Force
+          
+          Write-Host "Looking for artifact folder containing: $version"
+          
+          # 查找包含版本号的文件夹
+          $sourceFolder = Get-ChildItem -Path . -Directory | Where-Object { $_.Name -like "*$version*" } | Select-Object -First 1
+          
+          if ($sourceFolder) {
+            Write-Host "Found folder: $($sourceFolder.FullName)"
+            if (Test-Path $targetFolder) {
+              Remove-Item -Path $targetFolder -Recurse -Force
+            }
+            Rename-Item -Path $sourceFolder.FullName -NewName $targetFolder
+            Write-Host "Renamed $($sourceFolder.Name) to $targetFolder"
+          } else {
+            Write-Host "Artifact folder not found, checking current directory structure:"
+            Get-ChildItem -Path . -Recurse -Directory | Where-Object { $_.Name -like "*MenyooSP*" } | ForEach-Object { Write-Host $_.FullName }
           }
-          Rename-Item -Path $sourceFolder -NewName $targetFolder
-          Write-Host "Renamed $sourceFolder to $targetFolder"
 
       - name: Rename asi file with version
         shell: pwsh
