@@ -160,7 +160,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         # Artifact name
-        name: MenyooSP-${{ env.VERSION }}
+        name: MenyooSP
         path: |
           Solution/source/_Build/bin/Release/
           !Solution/source/_Build/bin/Release/Trash/
@@ -193,31 +193,6 @@ jobs:
       - uses: actions/checkout@v3
 
       - uses: actions/download-artifact@v4
-        with:
-          name: MenyooSP-${{ env.VERSION }}
-
-      - name: Rename artifact folder
-        shell: pwsh
-        run: |
-          $version = "${{ env.VERSION }}"
-          $targetFolder = "MenyooSP"
-          
-          Write-Host "Looking for artifact folder containing: $version"
-          
-          # 查找包含版本号的文件夹
-          $sourceFolder = Get-ChildItem -Path . -Directory | Where-Object { $_.Name -like "*$version*" } | Select-Object -First 1
-          
-          if ($sourceFolder) {
-            Write-Host "Found folder: $($sourceFolder.FullName)"
-            if (Test-Path $targetFolder) {
-              Remove-Item -Path $targetFolder -Recurse -Force
-            }
-            Rename-Item -Path $sourceFolder.FullName -NewName $targetFolder
-            Write-Host "Renamed $($sourceFolder.Name) to $targetFolder"
-          } else {
-            Write-Host "Artifact folder not found, checking current directory structure:"
-            Get-ChildItem -Path . -Recurse -Directory | Where-Object { $_.Name -like "*MenyooSP*" } | ForEach-Object { Write-Host $_.FullName }
-          }
 
       - name: Rename asi file with version
         shell: pwsh
